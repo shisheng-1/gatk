@@ -36,7 +36,7 @@ However, we can do our own filtering.  First, we capture the full JSON job detai
 bq --project_id aou-genomics-curation-prod ls -j -n 100000 --format prettyjson > all.json
 
 # extract several fields from the JSON where the job has the label of the gvs_prepare_callset for gvs_tool_name
-cat all.json | jq -r '.[] | select(.configuration.labels.gvs_tool_name == "gvs_prepare_callset") | [ .id, .configuration.query.destinationTable.tableId, .configuration.labels.id, .configuration.labels.gvs_query_name, .errorResult.message ] | @csv '
+cat all.json | jq -r '.[] | select(.configuration.labels.gvs_tool_name == "gvs_prepare_callset") | [ .id, .configuration.query.destinationTable.tableId, .configuration.labels.id, .configuration.labels.gvs_query_name, .errorResult.message, .statistics.query.totalBytesProcessed ] | @csv '
 ```
 
 ### Download Job Metadata
