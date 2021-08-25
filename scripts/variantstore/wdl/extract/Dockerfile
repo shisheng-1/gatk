@@ -10,5 +10,8 @@ ADD create_cohort_extract_data_table.py /app
 ADD create_variant_annotation_table.py /app
 ADD extract_subpop.py /app
 
+# Add static files
+ADD ../../variant_annotations_table/custom_annotations_template.tsv /app
+
 WORKDIR /app
 ENTRYPOINT ["/bin/bash"]
