@@ -99,6 +99,7 @@ workflows:
        - /scripts/variantstore/wdl/GvsSitesOnlyVCF.example.inputs.json
      filters:
        branches:
+         - master
          - ah_var_store
          - rc-new-branch
    - name: GvsValidateVatTable
@@ -106,6 +107,7 @@ workflows:
      primaryDescriptorPath: /scripts/variantstore/variant_annotations_table/GvsValidateVAT.wdl
      filters:
        branches:
+         - master
          - ah_var_store
          - rc-new-branch
    - name: MitochondriaPipeline
