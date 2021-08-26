@@ -100,7 +100,6 @@ workflows:
      filters:
        branches:
          - ah_var_store
-         - rc-vs-144-participant-count
    - name: MitochondriaPipeline
      subclass: WDL
      primaryDescriptorPath: /scripts/mitochondria_m2_wdl/MitochondriaPipeline.wdl
