@@ -99,6 +99,14 @@ workflows:
        - /scripts/variantstore/wdl/GvsSitesOnlyVCF.example.inputs.json
      filters:
        branches:
+         - master
+         - ah_var_store
+   - name: GvsValidateVat
+     subclass: WDL
+     primaryDescriptorPath: /scripts/variantstore/variant_annotations_table/GvsValidateVAT.wdl
+     filters:
+       branches:
+         - master
          - ah_var_store
    - name: MitochondriaPipeline
      subclass: WDL
