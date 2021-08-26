@@ -2,6 +2,6 @@
 #assembly=GRCh38
 #matchVariantsBy=allele
 #CHROM	POS	REF	ALT	AC	AN	AF	AC_Hom	AC_Het
-#categories	.	.	.	AlleleCount	AlleleNumber	AlleleFrequency	AlleleCountHomozygous	AlleleCountHeterozygous
+#categories	.	.	.	AlleleCount	AlleleNumber	AlleleFrequency	AlleleCount	AlleleCount
 #descriptions	.	.	.	.	.	.	.	.
 #type	.	.	.	number	number	number	number	number
