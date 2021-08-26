@@ -101,6 +101,7 @@ workflows:
        branches:
          - master
          - ah_var_store
+         - rc-vs-144-participant-count
    - name: GvsValidateVat
      subclass: WDL
      primaryDescriptorPath: /scripts/variantstore/variant_annotations_table/GvsValidateVAT.wdl
