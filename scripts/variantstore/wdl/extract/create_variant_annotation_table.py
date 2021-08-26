@@ -177,7 +177,7 @@ def get_subpopulation_calculations(variant_obj):
         subpop_ac_val = subpop_annotations.get("AC") # note that these can be null if there is no value in the annotations. They will be null in the VAT
         subpop_an_val = subpop_annotations.get("AN")
         subpop_af_val = subpop_annotations.get("AF")
-        subpop_sc_val = (subpop_annotations.get("AC_Hom") + gvs_annotations.get('AC_Het')) * .5
+        subpop_sc_val = (subpop_annotations.get("AC_Hom") + subpop_annotations.get('AC_Het')) * .5
         # here we set the subpopulation ac/an/af values
         row["_".join(["gvs", gvs_subpop, "ac"])] = subpop_ac_val
         row["_".join(["gvs", gvs_subpop, "an"])] = subpop_an_val
