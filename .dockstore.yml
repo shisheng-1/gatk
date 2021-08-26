@@ -100,14 +100,12 @@ workflows:
      filters:
        branches:
          - ah_var_store
-         - rc-vs-144-participant-count
-   - name: GvsValidateVatTable
+   - name: GvsValidateVat
      subclass: WDL
      primaryDescriptorPath: /scripts/variantstore/variant_annotations_table/GvsValidateVAT.wdl
      filters:
        branches:
          - ah_var_store
-         - rc-vs-144-participant-count
    - name: MitochondriaPipeline
      subclass: WDL
      primaryDescriptorPath: /scripts/mitochondria_m2_wdl/MitochondriaPipeline.wdl
