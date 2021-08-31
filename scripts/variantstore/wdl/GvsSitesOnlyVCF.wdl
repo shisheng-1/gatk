@@ -20,6 +20,8 @@ workflow GvsSitesOnlyVCF {
         File ancestry_file
     }
 
+    ## SO HERE'S A COMMENT --- CAN YOU SEE IT IN DOCKSTORE ?
+
     call MakeSubpopulationFiles {
         input:
             input_ancestry_file = ancestry_file
