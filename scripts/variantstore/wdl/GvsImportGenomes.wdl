@@ -268,11 +268,14 @@ task ReleaseLock {
   }
 
   String has_service_account_file = if (defined(service_account_json_path)) then 'true' else 'false'
+  File pet_all_loaded = write_lines(load_pet_done)
 
   command <<<
     set -x
     set -e
 
+    # just to use the input
+    ls -l ~{pet_all_loaded}
     if [ ~{has_service_account_file} = 'true' ]; then
       gsutil cp ~{service_account_json_path} local.service_account.json
       export GOOGLE_APPLICATION_CREDENTIALS=local.service_account.json
@@ -834,9 +837,14 @@ task SetIsLoadedColumn {
 
   String has_service_account_file = if (defined(service_account_json_path)) then 'true' else 'false'
   Array[String] gvs_id_array = read_lines(gvs_ids)
+  File pet_all_loaded = write_lines(load_pet_done)
+
 
   command <<<
     set -ex
+    
+    # just to use the input
+    ls -l ~{pet_all_loaded}
 
     if [ ~{has_service_account_file} = 'true' ]; then
       gsutil cp ~{service_account_json_path} local.service_account.json
