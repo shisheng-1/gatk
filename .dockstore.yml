@@ -83,6 +83,7 @@ workflows:
        branches:
          - master
          - ah_var_store
+         - ah_debug_releaselock
    - name: GvsPrepareCallset
      subclass: WDL
      primaryDescriptorPath: /scripts/variantstore/wdl/GvsPrepareCallset.wdl
