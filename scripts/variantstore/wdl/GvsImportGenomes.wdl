@@ -59,12 +59,14 @@ workflow GvsImportGenomes {
     }
   }
 
+  Int max_table_id = select_first([GetSampleIds.max_table_id, GetMaxTableIdLegacy.max_table_id])
+
   call CreateTables as CreatePetTables {
   	input:
       project_id = project_id,
       dataset_name = dataset_name,
       datatype = "pet",
-      max_table_id = select_first([GetSampleIds.max_table_id, GetMaxTableIdLegacy.max_table_id]),
+      max_table_id = max_table_id,
       schema = pet_schema,
       superpartitioned = "true",
       partitioned = "true",
@@ -79,7 +81,7 @@ workflow GvsImportGenomes {
       project_id = project_id,
       dataset_name = dataset_name,
       datatype = "vet",
-      max_table_id = select_first([GetSampleIds.max_table_id, GetMaxTableIdLegacy.max_table_id]),
+      max_table_id = max_table_id,
       schema = vet_schema,
       superpartitioned = "true",
       partitioned = "true",
@@ -126,7 +128,9 @@ workflow GvsImportGenomes {
     }
   }
 
-  scatter (i in range(select_first([GetSampleIds.max_table_id, GetMaxTableIdLegacy.max_table_id]))) {
+
+
+  scatter (i in range(max_table_id)) {
     call LoadTable as LoadPetTable {
     input:
       project_id = project_id,
@@ -144,7 +148,7 @@ workflow GvsImportGenomes {
     }
   }
 
-  scatter (i in range(select_first([GetSampleIds.max_table_id, GetMaxTableIdLegacy.max_table_id]))) {
+  scatter (i in range(max_table_id)) {
     call LoadTable as LoadVetTable {
     input:
       project_id = project_id,
