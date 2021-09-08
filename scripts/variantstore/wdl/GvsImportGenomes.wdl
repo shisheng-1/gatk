@@ -40,23 +40,14 @@ workflow GvsImportGenomes {
       service_account_json_path = service_account_json_path,
       preemptible_tries = preemptible_tries
   }
-
-  if (defined(sample_map)) {
-    call GetMaxTableIdLegacy {
-      input:
-        sample_map = select_first([sample_map])
-    }
-  }
   
-  if (!defined(sample_map)) {
-    call GetSampleIds {
-      input:
-        external_sample_names = external_sample_names,
-        project_id = project_id,
-        dataset_name = dataset_name,
-        table_name = "sample_info",
-        service_account_json_path = service_account_json_path
-    }
+  call GetSampleIds {
+    input:
+      external_sample_names = external_sample_names,
+      project_id = project_id,
+      dataset_name = dataset_name,
+      table_name = "sample_info",
+      service_account_json_path = service_account_json_path
   }
 
   call CreateTables as CreatePetTables {
@@ -64,7 +55,7 @@ workflow GvsImportGenomes {
       project_id = project_id,
       dataset_name = dataset_name,
       datatype = "pet",
-      max_table_id = select_first([GetSampleIds.max_table_id, GetMaxTableIdLegacy.max_table_id]),
+      max_table_id = GetSampleIds.max_table_id,
       schema = pet_schema,
       superpartitioned = "true",
       partitioned = "true",
@@ -79,7 +70,7 @@ workflow GvsImportGenomes {
       project_id = project_id,
       dataset_name = dataset_name,
       datatype = "vet",
-      max_table_id = select_first([GetSampleIds.max_table_id, GetMaxTableIdLegacy.max_table_id]),
+      max_table_id = GetSampleIds.max_table_id,
       schema = vet_schema,
       superpartitioned = "true",
       partitioned = "true",
@@ -126,7 +117,7 @@ workflow GvsImportGenomes {
     }
   }
 
-  scatter (i in range(select_first([GetSampleIds.max_table_id, GetMaxTableIdLegacy.max_table_id]))) {
+  scatter (i in range(GetSampleIds.max_table_id)) {
     call LoadTable as LoadPetTable {
     input:
       project_id = project_id,
@@ -144,7 +135,7 @@ workflow GvsImportGenomes {
     }
   }
 
-  scatter (i in range(select_first([GetSampleIds.max_table_id, GetMaxTableIdLegacy.max_table_id]))) {
+  scatter (i in range(GetSampleIds.max_table_id)) {
     call LoadTable as LoadVetTable {
     input:
       project_id = project_id,
@@ -299,32 +290,6 @@ task ReleaseLock {
       preemptible: select_first([preemptible_tries, 5])
       cpu: 1
     }
-}
-
-task GetMaxTableIdLegacy {
-  input {
-    File sample_map
-    Int samples_per_table = 4000
- 
-    # runtime
-    Int? preemptible_tries
-  }
-
-  command <<<
-      set -e
-      max_sample_id=$(cat ~{sample_map} | cut -d"," -f1 | sort -rn | head -1)
-      python -c "from math import ceil; print(ceil($max_sample_id/~{samples_per_table}))"
-  >>>
-  runtime {
-      docker: "python:3.8-slim-buster"
-      memory: "1 GB"
-      disks: "local-disk 10 HDD"
-      preemptible: select_first([preemptible_tries, 5])
-      cpu: 1
-  }
-  output {
-      Int max_table_id = read_int(stdout())
-  }
 }
 
 
@@ -769,7 +734,12 @@ task LoadTable {
         paste bq_load_details.tmp bq_wait_details.tmp > bq_final_job_statuses.txt
 
         # move files from each set into set-level "done" directories
-        gsutil -m mv "${DIR}set_${set}/${FILES}" "${DIR}set_${set}/done/" 2> gsutil_mv_done.log
+        for set in $(sed 1d ~{datatype}_du_sets.txt | cut -f4 | sort | uniq)
+        do
+          # move files from each set into set-level "done" directories
+          echo "Moving set $set data into done directory."
+          gsutil -m mv "${DIR}set_${set}/${FILES}" "${DIR}set_${set}/done/" >> gsutil_mv_done.log
+        done
 
     else
         echo "no ${FILES} files to process in $DIR"
@@ -788,6 +758,7 @@ task LoadTable {
     String done = "true"
     File? manifest_file = "~{datatype}_du_sets.txt"
     File? final_job_statuses = "bq_final_job_statuses.txt"
+    File? mv_log = "gsutil_mv_done.log"
   }
 }
 
@@ -820,15 +791,13 @@ task SetIsLoadedColumn {
     Array[String] load_pet_done
     String dataset_name
     String project_id
-    File? gvs_ids
-    File? sample_map # remove this when we delete passing in a sample map
+    File gvs_ids
     String? service_account_json_path
     Int? preemptible_tries
   }
 
   String has_service_account_file = if (defined(service_account_json_path)) then 'true' else 'false'
-  # hack that only works when using sample_info table
-  Array[String] gvs_id_array = read_lines(select_first([gvs_ids, sample_map]))
+  Array[String] gvs_id_array = read_lines(gvs_ids)
 
   command <<<
     set -ex
