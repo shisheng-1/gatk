@@ -164,16 +164,16 @@ workflow GvsImportGenomes {
       preemptible_tries = preemptible_tries
   }
 
-  # call ReleaseLock {
-  #   input:
-  #     run_uuid = SetLock.run_uuid,
-  #     output_directory = output_directory,
-  #     load_sample_info_done = SetIsLoadedColumn.done,
-  #     load_pet_done = LoadPetTable.done,
-  #     load_vet_done = LoadVetTable.done,
-  #     service_account_json_path = service_account_json_path,
-  #     preemptible_tries = preemptible_tries
-  # }
+  call ReleaseLock {
+    input:
+      # run_uuid = SetLock.run_uuid,
+      output_directory = output_directory,
+      load_sample_info_done = SetIsLoadedColumn.done,
+      # load_pet_done = LoadPetTable.done,
+      # load_vet_done = LoadVetTable.done,
+      service_account_json_path = service_account_json_path,
+      preemptible_tries = preemptible_tries
+  }
 
   output {
     Boolean loaded_in_gvs = true
@@ -247,11 +247,11 @@ task ReleaseLock {
   }
 
   input {
-    String run_uuid
+    # String run_uuid
     String output_directory
     String load_sample_info_done
-    Array[String] load_pet_done
-    Array[String] load_vet_done
+    # Array[String] load_pet_done
+    # Array[String] load_vet_done
     String? service_account_json_path
 
     # runtime
@@ -273,14 +273,15 @@ task ReleaseLock {
 
     LOCKFILE="~{output_directory}/LOCKFILE"
     EXISTING_LOCK_ID=$(gsutil cat ${LOCKFILE})
-    CURRENT_RUN_ID="~{run_uuid}"
+    # CURRENT_RUN_ID="~{run_uuid}"
 
-    if [ ${EXISTING_LOCK_ID} = ${CURRENT_RUN_ID} ]; then
-      gsutil rm $LOCKFILE
-    else
-      echo "ERROR: found mismatched lockfile containing run ${EXISTING_LOCK_ID}, which does not match this run ${CURRENT_RUN_ID}." 1>&2
-      exit 1
-    fi
+    gsutil rm $LOCKFILE
+    # if [ ${EXISTING_LOCK_ID} = ${CURRENT_RUN_ID} ]; then
+    #   gsutil rm $LOCKFILE
+    # else
+    #   echo "ERROR: found mismatched lockfile containing run ${EXISTING_LOCK_ID}, which does not match this run ${CURRENT_RUN_ID}." 1>&2
+    #   exit 1
+    # fi
   >>>
 
     runtime {
