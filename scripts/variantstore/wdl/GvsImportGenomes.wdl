@@ -153,27 +153,27 @@ workflow GvsImportGenomes {
     }
   }
 
-  # call SetIsLoadedColumn {
-  #   input:
-  #     load_vet_done = LoadVetTable.done,
-  #     load_pet_done = LoadPetTable.done,
-  #     dataset_name = dataset_name,
-  #     gvs_ids = GetSampleIds.gvs_ids,
-  #     service_account_json_path = service_account_json_path,
-  #     project_id = project_id,
-  #     preemptible_tries = preemptible_tries
-  # }
-
-  call ReleaseLock {
+  call SetIsLoadedColumn {
     input:
-      run_uuid = SetLock.run_uuid,
-      output_directory = output_directory,
-      # load_sample_info_done = SetIsLoadedColumn.done,
-      load_pet_done = LoadPetTable.done,
       load_vet_done = LoadVetTable.done,
+      load_pet_done = LoadPetTable.done,
+      dataset_name = dataset_name,
+      gvs_ids = GetSampleIds.gvs_ids,
       service_account_json_path = service_account_json_path,
+      project_id = project_id,
       preemptible_tries = preemptible_tries
   }
+
+  # call ReleaseLock {
+  #   input:
+  #     run_uuid = SetLock.run_uuid,
+  #     output_directory = output_directory,
+  #     load_sample_info_done = SetIsLoadedColumn.done,
+  #     load_pet_done = LoadPetTable.done,
+  #     load_vet_done = LoadVetTable.done,
+  #     service_account_json_path = service_account_json_path,
+  #     preemptible_tries = preemptible_tries
+  # }
 
   output {
     Boolean loaded_in_gvs = true
@@ -249,7 +249,7 @@ task ReleaseLock {
   input {
     String run_uuid
     String output_directory
-    # String load_sample_info_done
+    String load_sample_info_done
     Array[String] load_pet_done
     Array[String] load_vet_done
     String? service_account_json_path
