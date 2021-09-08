@@ -273,9 +273,9 @@ task ReleaseLock {
 
     LOCKFILE="~{output_directory}/LOCKFILE"
     EXISTING_LOCK_ID=$(gsutil cat ${LOCKFILE})
-    # CURRENT_RUN_ID="~{run_uuid}"
 
     gsutil rm $LOCKFILE
+    
     # if [ ${EXISTING_LOCK_ID} = ${CURRENT_RUN_ID} ]; then
     #   gsutil rm $LOCKFILE
     # else
