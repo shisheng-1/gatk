@@ -40,7 +40,7 @@ workflow GvsImportGenomes {
       service_account_json_path = service_account_json_path,
       preemptible_tries = preemptible_tries
   }
-  
+
   call GetSampleIds {
     input:
       external_sample_names = external_sample_names,
@@ -249,7 +249,7 @@ task ReleaseLock {
   input {
     # String run_uuid
     String output_directory
-    String load_sample_info_done
+    File load_sample_info_done
     # Array[String] load_pet_done
     # Array[String] load_vet_done
     String? service_account_json_path
@@ -275,7 +275,7 @@ task ReleaseLock {
     EXISTING_LOCK_ID=$(gsutil cat ${LOCKFILE})
 
     gsutil rm $LOCKFILE
-    
+
     # if [ ${EXISTING_LOCK_ID} = ${CURRENT_RUN_ID} ]; then
     #   gsutil rm $LOCKFILE
     # else
@@ -363,7 +363,7 @@ task CheckForDuplicateData {
       cpu: 1
   }
   output {
-      Boolean done = true
+      File done = "sorted_names.txt"
   }
 }
 
@@ -409,7 +409,7 @@ task CreateImportTsvs {
     Boolean? drop_state_includes_greater_than = false
 
     Boolean call_cache_tsvs = false
-    Boolean duplicate_check_passed
+    File duplicate_check_passed
 
     # runtime
     Int? preemptible_tries
@@ -541,7 +541,7 @@ task CreateImportTsvs {
       cpu: 1
   }
   output {
-      String done = "true"
+      File done = "LOCKFILE"
   }
 }
 
@@ -612,6 +612,7 @@ task CreateTables {
       set +e
       bq show --project_id ~{project_id} $TABLE > /dev/null
       BQ_SHOW_RC=$?
+      echo $BQ_SHOW_RC > done.txt
       set -e
       if [ $BQ_SHOW_RC -ne 0 ]; then
         echo "making table $TABLE"
@@ -621,7 +622,7 @@ task CreateTables {
   >>>
 
   output {
-    String done = "true"
+    File done = "done.txt"
   }
 
   runtime {
@@ -647,8 +648,8 @@ task LoadTable {
     String superpartitioned
     String? schema
     String? service_account_json_path
-    String table_creation_done
-    Array[String] tsv_creation_done
+    File table_creation_done
+    Array[File] tsv_creation_done
     String run_uuid
 
     String docker
@@ -756,7 +757,7 @@ task LoadTable {
   }
 
   output {
-    String done = "true"
+    File done = "bq_final_job_statuses.txt"
     File? manifest_file = "~{datatype}_du_sets.txt"
     File? final_job_statuses = "bq_final_job_statuses.txt"
     File? mv_log = "gsutil_mv_done.log"
@@ -788,8 +789,8 @@ task SetIsLoadedColumn {
   }
 
   input {
-    Array[String] load_vet_done
-    Array[String] load_pet_done
+    Array[File] load_vet_done
+    Array[File] load_pet_done
     String dataset_name
     String project_id
     File gvs_ids
@@ -814,7 +815,10 @@ task SetIsLoadedColumn {
     # set is_loaded to true if there is a corresponding pet table partition with rows for that sample_id
     bq --location=US --project_id=~{project_id} query --format=csv --use_legacy_sql=false \
     "UPDATE ~{dataset_name}.sample_info SET is_loaded = true WHERE sample_id IN (SELECT CAST(partition_id AS INT64) from ~{dataset_name}.INFORMATION_SCHEMA.PARTITIONS WHERE partition_id in ('~{sep="\',\'" gvs_id_array}') AND total_logical_bytes > 0 AND table_name LIKE \"pet_%\")"
-  >>>
+
+    # output updated schema into file for output
+    bq show --project_id=~{project_id} ~{dataset_name}.sample_info > sample_info_schema.txt
+>>>
 
   runtime {
     docker: "gcr.io/google.com/cloudsdktool/cloud-sdk:305.0.0"
@@ -825,7 +829,7 @@ task SetIsLoadedColumn {
   }
 
   output {
-    String done = "done"
+    File done = "sample_info_schema.txt"
   }
 }
 
