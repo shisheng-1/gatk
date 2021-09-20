@@ -41,8 +41,10 @@ After using the json file to auth as that service account, you can query the
 
 
 ## Running the VAT pipeline
-The VAT pipeline is a set of WDLs
+The VAT pipeline is a set of two WDLs. The first is used to create a VAT in BQ and an exported TSV in GCP and the second is run to validate the table in BQ
 - GvsSitesOnlyVCF.wdl
 - GvsValidateVAT.wdl
 
-The pipeline takes in a jointVCF and outputs a table in BigQuery.
+The pipeline takes in a (sharded) jointVCF and an ancestry file and outputs a table in BigQuery and a set of TSVs.
+It is assumed that you have run the above workflow, and have the proper access to BQ as well as the output files.
+The locations of these output vcfs as well as their indices should be put into two text files. Those will serve as two inputs to GvsSitesOnlyVCF.
