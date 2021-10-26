@@ -14,6 +14,8 @@ import org.broadinstitute.hellbender.utils.GenomeLocParser;
 import org.broadinstitute.hellbender.utils.GenomeLocSortedSet;
 import org.broadinstitute.hellbender.utils.SimpleInterval;
 import org.broadinstitute.hellbender.utils.tsv.SimpleXSVWriter;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import java.io.File;
 import java.io.IOException;
@@ -21,8 +23,8 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 
-public final class PetTsvCreator {
-    private static final Logger logger = LogManager.getLogger(PetTsvCreator.class);
+public final class PetCreator {
+    private static final Logger logger = LogManager.getLogger(PetCreator.class);
 
     private CommonCode.OutputType outputType;
 
@@ -31,23 +33,23 @@ public final class PetTsvCreator {
     private PetOrcWriter petOrcWriter = null;
     private PetAvroWriter petAvroWriter = null;
     private PetParquetWriter petParquetWriter = null;
-    private PetJsonWriter petBQJsonWriter = null;
+    private PendingBQWriter petBQJsonWriter = null;
 
     private RefRangesAvroWriter refRangesAvroWriter = null;
     private boolean writePetData;
     private boolean writeReferenceRanges;
-    private boolean useBQWriteApi = false;
     private final String sampleId;
     private SimpleInterval previousInterval;
     private final SAMSequenceDictionary seqDictionary;
     private final Set<GQStateEnum> gqStatesToIgnore = new HashSet<GQStateEnum>();
     private GenomeLocSortedSet coverageLocSortedSet;
     private static String PET_FILETYPE_PREFIX = "pet_";
+    private static String PREFIX_SEPARATOR = "_";
     private static String REF_RANGES_FILETYPE_PREFIX = "ref_";
     private BigQueryWriteClient bqWriteClient;
 
 
-    public PetTsvCreator(String sampleIdentifierForOutputFileName, String sampleId, String tableNumberPrefix, SAMSequenceDictionary seqDictionary, GQStateEnum gqStateToIgnore, final boolean dropAboveGqThreshold, final File outputDirectory, final CommonCode.OutputType outputType, final boolean writePetData, final boolean writeReferenceRanges, final String projectId, final String datasetName) {
+    public PetCreator(String sampleIdentifierForOutputFileName, String sampleId, String tableNumber, SAMSequenceDictionary seqDictionary, GQStateEnum gqStateToIgnore, final boolean dropAboveGqThreshold, final File outputDirectory, final CommonCode.OutputType outputType, final boolean writePetData, final boolean writeReferenceRanges, final String projectId, final String datasetName) {
         this.sampleId = sampleId;
         this.seqDictionary = seqDictionary;
         this.outputType = outputType;
@@ -57,16 +59,17 @@ public final class PetTsvCreator {
         coverageLocSortedSet = new GenomeLocSortedSet(new GenomeLocParser(seqDictionary));
 
         try {
-            final File petOutputFile = new File(outputDirectory, PET_FILETYPE_PREFIX + tableNumberPrefix + sampleIdentifierForOutputFileName + "." + outputType.toString().toLowerCase());
+            final File petOutputFile = new File(outputDirectory, PET_FILETYPE_PREFIX + tableNumber + PREFIX_SEPARATOR + sampleIdentifierForOutputFileName + "." + outputType.toString().toLowerCase());
             switch (outputType) {
-                case JSON:
-                    useBQWriteApi = true;
+                case BQ:
                     if (projectId == null || datasetName == null) {
                         throw new UserException("Must specify project-id and dataset-name when using BQ output mode.");
                     }
+                    bqWriteClient = BigQueryWriteClient.create();
+                    petBQJsonWriter = new PendingBQWriter(bqWriteClient, projectId, datasetName,PET_FILETYPE_PREFIX + tableNumber);
                     break;
                 case TSV:
-                    List<String> petHeader = PetTsvCreator.getHeaders();
+                    List<String> petHeader = PetCreator.getHeaders();
                     petTsvWriter = new SimpleXSVWriter(petOutputFile.toPath(), IngestConstants.SEPARATOR);
                     petTsvWriter.setHeaderLine(petHeader);
                     break;
@@ -84,13 +87,8 @@ public final class PetTsvCreator {
             }
 
             if (writeReferenceRanges) {
-                final File refOutputFile = new File(outputDirectory, REF_RANGES_FILETYPE_PREFIX + tableNumberPrefix + sampleIdentifierForOutputFileName + ".avro");
+                final File refOutputFile = new File(outputDirectory, REF_RANGES_FILETYPE_PREFIX + tableNumber + PREFIX_SEPARATOR + sampleIdentifierForOutputFileName + ".avro");
                 refRangesAvroWriter = new RefRangesAvroWriter(refOutputFile.getCanonicalPath());
-            }
-
-            if (useBQWriteApi) {
-                bqWriteClient = BigQueryWriteClient.create();
-                petBQJsonWriter = new PetJsonWriter(bqWriteClient, projectId, datasetName,PET_FILETYPE_PREFIX + tableNumberPrefix);
             }
 
         } catch (final IOException e) {
@@ -158,7 +156,7 @@ public final class PetTsvCreator {
             }
 
             // create PET output if the reference block's GQ is not the one to discard or its a variant
-            if (!variant.isReferenceBlock() || !this.gqStatesToIgnore.contains(PetTsvCreator.getGQStateEnum(variant.getGenotype(0).getGQ()))) {
+            if (!variant.isReferenceBlock() || !this.gqStatesToIgnore.contains(PetCreator.getGQStateEnum(variant.getGenotype(0).getGQ()))) {
 
                 // add interval to "covered" intervals
                 setCoveredInterval(variantChr, start, end);
@@ -200,8 +198,13 @@ public final class PetTsvCreator {
                         String state = TSVLineToCreatePet.get(2);
 
                         switch (outputType) {
-                            case JSON:
-                                petBQJsonWriter.addRow(location, sampleId, state);
+                            case BQ:
+                                try {
+                                    petBQJsonWriter.addJsonRow(createJson(location, sampleId, state));
+                                } catch (Exception ex) {
+                                    // will be Interrupted or Execution Exception
+                                    throw new IOException("BQ exception", ex);
+                                }
                                 break;
                             case TSV:
                                 petTsvWriter.getNewLineBuilder().setRow(TSVLineToCreatePet).write();
@@ -303,6 +306,14 @@ public final class PetTsvCreator {
         return rows;
     }
 
+    private JSONObject createJson(long location, long sampleId, String state) {
+        JSONObject record = new JSONObject();
+        record.put(SchemaUtils.LOCATION_FIELD_NAME, location);
+        record.put(SchemaUtils.SAMPLE_ID_FIELD_NAME, sampleId);
+        record.put(SchemaUtils.STATE_FIELD_NAME, state);
+        return record;
+    }
+
 
     public List<List<String>> createSpanDelRows(final long start, final long end, final VariantContext variant, final String sampleName) {
         if (variant.isReferenceBlock()){
@@ -339,6 +350,13 @@ public final class PetTsvCreator {
                 case TSV:
                     petTsvWriter.getNewLineBuilder().setRow(row).write();
                     break;
+                case BQ:
+                    try {
+                        petBQJsonWriter.addJsonRow(createJson(location, sampleId, state));
+                    } catch (Exception ex) {
+                        // will be Interrupted or Execution Exception
+                        throw new IOException("BQ exception", ex);
+                    }
                 case ORC:
                     petOrcWriter.addRow(location, sampleId, state);
                     break;
@@ -419,9 +437,17 @@ public final class PetTsvCreator {
         return Arrays.stream(PetFieldEnum.values()).map(String::valueOf).collect(Collectors.toList());
     }
 
+    public void completeCreation() {
+        if (outputType == CommonCode.OutputType.BQ && petBQJsonWriter != null) {
+            petBQJsonWriter.commitWriteStreams();
+        }
+    }
+
     public void closeTool() {
         try {
             switch (outputType) {
+                case BQ:
+                    if (petBQJsonWriter != null) petBQJsonWriter.close();
                 case TSV:
                     if (petTsvWriter != null) petTsvWriter.close();
                     break;
