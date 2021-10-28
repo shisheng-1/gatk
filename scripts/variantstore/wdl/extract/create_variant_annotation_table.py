@@ -184,7 +184,7 @@ def get_subpopulation_calculations(subpop_annotations):
       row["_".join(["gvs", gvs_subpop, "an"])] = subpop_an_val
       row["_".join(["gvs", gvs_subpop, "af"])] = subpop_af_val
       row["_".join(["gvs", gvs_subpop, "sc"])] = subpop_sc_val
-      if subpop_af_val != None and(max_af == None or subpop_af_val > max_af): # this will also set the first max_af value
+      if subpop_af_val != None and (max_af == None or subpop_af_val > max_af): # this will also set the first max_af value
         max_subpop = gvs_subpop
         max_ac = subpop_ac_val
         max_an = subpop_an_val
