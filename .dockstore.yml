@@ -111,6 +111,7 @@ workflows:
        branches:
          - master
          - ah_var_store
+         - ah_spike_writeapi
    - name: GvsPrepareCallset
      subclass: WDL
      primaryDescriptorPath: /scripts/variantstore/wdl/GvsPrepareCallset.wdl
