@@ -207,8 +207,6 @@ task ExtractAnAcAfFromVCF {
 
         cp ~{custom_annotations_template} ~{custom_annotations_file_name}
 
-        zgrep -v "*" ~{custom_annotations_file_name}
-
         gsutil cp ~{input_vcf} ~{local_input_vcf}
         gsutil cp ~{input_vcf_index} ~{local_input_vcf_index}
         gsutil cp ~{ref} Homo_sapiens_assembly38.fasta
@@ -234,15 +232,15 @@ task ExtractAnAcAfFromVCF {
         bcftools view -i 'N_ALT>500' ~{local_input_vcf} | bcftools query -f '%CHROM\t%POS\t%ID\t%REF\t%ALT\n' > track_dropped.tsv
 
         ## filter out sites with too many alt alleles
-        bcftools view -e 'N_ALT>500' --no-update  ~{local_input_vcf} | \
+        bcftools view -e 'N_ALT>500' --no-update  ~{local_input_vcf} -Ou | \
         ## filter out the non-passing sites
-        bcftools view  -f 'PASS,.' --no-update | \
+        bcftools view  -f 'PASS,.' --no-update -Ou | \
         ## normalize, left align and split multi allelic sites to new lines, remove duplicate lines
-        bcftools norm -m- --check-ref w -f Homo_sapiens_assembly38.fasta | \
+        bcftools norm -m- --check-ref w -f Homo_sapiens_assembly38.fasta -Ou | \
         ## filter out spanning deletions and variants with an AC of 0
-        bcftools view  -e 'ALT[0]="*" || AC=0' --no-update | \
+        bcftools view  -e 'ALT[0]="*" || AC=0' --no-update -Ou | \
         ## ensure that we respect the FT tag
-        bcftools filter -i "FORMAT/FT='PASS,.'" --set-GTs . > ~{normalized_vcf}
+        bcftools filter -i "FORMAT/FT='PASS,.'" --set-GTs . -Oz -o ~{normalized_vcf}
 
         ## clean up unneeded file
         rm ~{local_input_vcf}
@@ -255,7 +253,7 @@ task ExtractAnAcAfFromVCF {
         sort check_duplicates.tsv | uniq -d | cut -f1,2,3,4,5  > duplicates.tsv
         rm check_duplicates.tsv ## clean up
         ## remove those rows (that match up to the first 5 cols)
-        grep -v -wFf duplicates.tsv ~{normalized_vcf} > deduplicated.vcf
+        zgrep -v -wFf duplicates.tsv ~{normalized_vcf} > deduplicated.vcf.gz
         rm ~{normalized_vcf} ## clean up
 
         ## add duplicates to the file that's tracking dropped variants
@@ -264,7 +262,7 @@ task ExtractAnAcAfFromVCF {
 
         ## calculate annotations for all subpopulations
         ## TODO WHY SC
-        bcftools plugin fill-tags  -- deduplicated.vcf -S ~{subpopulation_sample_list} -t AC,AF,AN,AC_het,AC_hom,AC_Hemi | bcftools query -f \
+        bcftools plugin fill-tags  -- deduplicated.vcf.gz -S ~{subpopulation_sample_list} -t AC,AF,AN,AC_het,AC_hom,AC_Hemi | bcftools query -f \
         '%CHROM\t%POS\t%REF\t%ALT\t%AC\t%AN\t%AF\t%AC_Hom\t%AC_Het\t%AC_Hemi\t%AC_afr\t%AN_afr\t%AF_afr\t%AC_Hom_afr\t%AC_Het_afr\t%AC_Hemi_afr\t%AC_amr\t%AN_amr\t%AF_amr\t%AC_Hom_amr\t%AC_Het_amr\t%AC_Hemi_amr\t%AC_eas\t%AN_eas\t%AF_eas\t%AC_Hom_eas\t%AC_Het_eas\t%AC_Hemi_eas\t%AC_eur\t%AN_eur\t%AF_eur\t%AC_Hom_eur\t%AC_Het_eur\t%AC_Hemi_eur\t%AC_mid\t%AN_mid\t%AF_mid\t%AC_Hom_mid\t%AC_Het_mid\t%AC_Hemi_mid\t%AC_oth\t%AN_oth\t%AF_oth\t%AC_Hom_oth\t%AC_Het_oth\t%AC_Hemi_oth\t%AC_sas\t%AN_sas\t%AF_sas\t%AC_Hom_sas\t%AC_Het_sas\t%AC_Hemi_sas\n' \
         >> ~{custom_annotations_file_name}
 
@@ -272,7 +270,7 @@ task ExtractAnAcAfFromVCF {
         wc -l ~{custom_annotations_file_name} | awk '{print $1 -7}'  > count.txt
 
         ## compress the vcf and index it, make it sites-only for the next step
-        bcftools view --no-update --drop-genotypes deduplicated.vcf -Oz -o ~{normalized_vcf_compressed}
+        bcftools view --no-update --drop-genotypes deduplicated.vcf.gz -Oz -o ~{normalized_vcf_compressed}
         ## if we can spare the IO and want to pass a smaller file we can also drop the info field w bcftools annotate -x INFO
         bcftools index --tbi  ~{normalized_vcf_compressed}
 
