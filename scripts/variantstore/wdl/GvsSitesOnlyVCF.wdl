@@ -141,7 +141,7 @@ task MakeSubpopulationFiles {
           gsutil cp ~{inputFileofIndexFileNames} .
        fi
 
-
+        ## TODO WHY DO I EVEM!?!?
         python3 /app/extract_subpop.py \
           --input_path ~{updated_input_ancestry_file} \
           --output_path ~{output_ancestry_filename}
@@ -194,7 +194,7 @@ task ExtractAnAcAfFromVCF {
     String normalized_vcf_indexed = "normalized.vcf.gz.tbi"
 
     # separate multi-allelic sites into their own lines, remove deletions and filtered sites and make a sites only vcf
-    # while extracting the an/ac/af & sc by subpopulation into a tsv
+    # while extracting and calculating the an/ac/af & sc by subpopulation into a tsv
     command <<<
         set -e
 
@@ -245,6 +245,8 @@ task ExtractAnAcAfFromVCF {
         ## clean up unneeded file
         rm ~{local_input_vcf}
 
+        ## TODO WHY!??!?!
+        ## TODO explain that a better option needs to be designed
         ## make a file of just the first 5 columns of the tsv
         bcftools query ~{normalized_vcf} -f '%CHROM\t%POS\t%ID\t%REF\t%ALT\n' > check_duplicates.tsv
         ## check it for duplicates and put them in a new file
@@ -254,11 +256,12 @@ task ExtractAnAcAfFromVCF {
         grep -v -wFf duplicates.tsv ~{normalized_vcf} > deduplicated.vcf
         rm ~{normalized_vcf} ## clean up
 
-        ## add duplicates to the file tracking dropped variants
+        ## add duplicates to the file that's tracking dropped variants
         cat duplicates.tsv >> track_dropped.tsv
         rm duplicates.tsv ## clean up unneeded file
 
         ## calculate annotations for all subpopulations
+        ## TODO WHY SC
         bcftools plugin fill-tags  -- deduplicated.vcf -S ~{subpopulation_sample_list} -t AC,AF,AN,AC_het,AC_hom,AC_Hemi | bcftools query -f \
         '%CHROM\t%POS\t%REF\t%ALT\t%AC\t%AN\t%AF\t%AC_Hom\t%AC_Het\t%AC_Hemi\t%AC_afr\t%AN_afr\t%AF_afr\t%AC_Hom_afr\t%AC_Het_afr\t%AC_Hemi_afr\t%AC_amr\t%AN_amr\t%AF_amr\t%AC_Hom_amr\t%AC_Het_amr\t%AC_Hemi_amr\t%AC_eas\t%AN_eas\t%AF_eas\t%AC_Hom_eas\t%AC_Het_eas\t%AC_Hemi_eas\t%AC_eur\t%AN_eur\t%AF_eur\t%AC_Hom_eur\t%AC_Het_eur\t%AC_Hemi_eur\t%AC_mid\t%AN_mid\t%AF_mid\t%AC_Hom_mid\t%AC_Het_mid\t%AC_Hemi_mid\t%AC_oth\t%AN_oth\t%AF_oth\t%AC_Hom_oth\t%AC_Het_oth\t%AC_Hemi_oth\t%AC_sas\t%AN_sas\t%AF_sas\t%AC_Hom_sas\t%AC_Het_sas\t%AC_Hemi_sas\n' \
         >> ~{custom_annotations_file_name}
@@ -266,7 +269,7 @@ task ExtractAnAcAfFromVCF {
         ## for validation of the pipeline
         wc -l ~{custom_annotations_file_name} | awk '{print $1 -7}'  > count.txt
 
-        ## compress the vcf and index it, make it sites-only
+        ## compress the vcf and index it, make it sites-only for the next step
         bcftools view --no-update --drop-genotypes deduplicated.vcf -Oz -o ~{normalized_vcf_compressed}
         ## if we can spare the IO and want to pass a smaller file we can also drop the info field w bcftools annotate -x INFO
         bcftools index --tbi  ~{normalized_vcf_compressed}
@@ -326,6 +329,7 @@ task AnnotateVCF {
         echo "Creating custom annotations"
         mkdir customannotations_dir
         CUSTOM_ANNOTATIONS_FOLDER="$PWD/customannotations_dir"
+        ## TODO this is a pass thru
 
         # Add AC/AN/AF as custom annotations
         dotnet ~{custom_creation_location} customvar\
@@ -384,6 +388,7 @@ task PrepAnnotationJson {
     command <<<
         set -e
 
+        ## TODO WHAT DOES THIS DO
         python3 /app/create_variant_annotation_table.py \
           --annotated_json ~{annotation_json} \
           --output_vt_json ~{output_vt_json} \
@@ -438,6 +443,7 @@ task BigQueryLoadJson {
     }
 
     # There are two pre-vat tables. A variant table and a genes table. They are joined together for the vat table
+
     String vat_table = "vat_" + table_suffix
     String variant_transcript_table = "vat_vt_"  + table_suffix
     String genes_table = "vat_genes_" + table_suffix
@@ -720,7 +726,6 @@ task BigQueryExportVat {
         Boolean validate_jsons_done
     }
 
-    # There are two pre-vat tables. A variant table and a genes table. They are joined together for the vat table
     String vat_table = "vat_" + table_suffix
     String export_path = output_path + "export/" + contig + "/*.tsv.gz"
 
