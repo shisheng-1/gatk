@@ -207,6 +207,8 @@ task ExtractAnAcAfFromVCF {
 
         cp ~{custom_annotations_template} ~{custom_annotations_file_name}
 
+        zgrep -v "*" ~{custom_annotations_file_name}
+
         gsutil cp ~{input_vcf} ~{local_input_vcf}
         gsutil cp ~{input_vcf_index} ~{local_input_vcf_index}
         gsutil cp ~{ref} Homo_sapiens_assembly38.fasta
