@@ -156,9 +156,6 @@ task ImportSample {
     input_vcf: {
       localization_optional: true
     }
-    input_vcf_index: {
-      localization_optional: true
-    }
   }
   command <<<
     set -e
