@@ -141,7 +141,7 @@ task MakeSubpopulationFiles {
           gsutil cp ~{inputFileofIndexFileNames} .
        fi
 
-        ## TODO WHY DO I EVEM!?!?
+        ## the ancestry file is processed down to a simple mapping from sample to subpopulation
         python3 /app/extract_subpop.py \
           --input_path ~{updated_input_ancestry_file} \
           --output_path ~{output_ancestry_filename}
@@ -245,9 +245,9 @@ task ExtractAnAcAfFromVCF {
         ## clean up unneeded file
         rm ~{local_input_vcf}
 
-        ## TODO WHY!??!?!
-        ## TODO explain that a better option needs to be designed
-        ## make a file of just the first 5 columns of the tsv
+        ## During normalization, sometimes duplicate variamts appear but with different calculations. This seems to be a bug in bcftools. For now we arre dropping all duplicate variants
+        ## The say in which this is done is a bit hamfisted and should be optimized in the future.
+        ## to locate the duplicates, we first make a file of just the first 5 columns
         bcftools query ~{normalized_vcf} -f '%CHROM\t%POS\t%ID\t%REF\t%ALT\n' > check_duplicates.tsv
         ## check it for duplicates and put them in a new file
         sort check_duplicates.tsv | uniq -d | cut -f1,2,3,4,5  > duplicates.tsv
@@ -261,7 +261,7 @@ task ExtractAnAcAfFromVCF {
         rm duplicates.tsv ## clean up unneeded file
 
         ## calculate annotations for all subpopulations
-        ## TODO WHY SC
+        ## AC_het,AC_hom and AC_Hemi are used to calculate the participant count
         bcftools plugin fill-tags  -- deduplicated.vcf.gz -S ~{subpopulation_sample_list} -t AC,AF,AN,AC_het,AC_hom,AC_Hemi | bcftools query -f \
         '%CHROM\t%POS\t%REF\t%ALT\t%AC\t%AN\t%AF\t%AC_Hom\t%AC_Het\t%AC_Hemi\t%AC_afr\t%AN_afr\t%AF_afr\t%AC_Hom_afr\t%AC_Het_afr\t%AC_Hemi_afr\t%AC_amr\t%AN_amr\t%AF_amr\t%AC_Hom_amr\t%AC_Het_amr\t%AC_Hemi_amr\t%AC_eas\t%AN_eas\t%AF_eas\t%AC_Hom_eas\t%AC_Het_eas\t%AC_Hemi_eas\t%AC_eur\t%AN_eur\t%AF_eur\t%AC_Hom_eur\t%AC_Het_eur\t%AC_Hemi_eur\t%AC_mid\t%AN_mid\t%AF_mid\t%AC_Hom_mid\t%AC_Het_mid\t%AC_Hemi_mid\t%AC_oth\t%AN_oth\t%AF_oth\t%AC_Hom_oth\t%AC_Het_oth\t%AC_Hemi_oth\t%AC_sas\t%AN_sas\t%AF_sas\t%AC_Hom_sas\t%AC_Het_sas\t%AC_Hemi_sas\n' \
         >> ~{custom_annotations_file_name}
@@ -388,7 +388,7 @@ task PrepAnnotationJson {
     command <<<
         set -e
 
-        ## TODO WHAT DOES THIS DO
+        ## the annotation jsons are split into the specific VAT schema
         python3 /app/create_variant_annotation_table.py \
           --annotated_json ~{annotation_json} \
           --output_vt_json ~{output_vt_json} \
@@ -403,7 +403,7 @@ task PrepAnnotationJson {
         gsutil cp ~{output_vt_json} '~{output_vt_gcp_path}'
         gsutil cp ~{output_genes_json} '~{output_genes_gcp_path}'
 
-        # for debugging only
+        # for debugging purposes only
         gsutil cp ~{annotation_json} '~{output_annotations_gcp_path}'
 
      >>>
