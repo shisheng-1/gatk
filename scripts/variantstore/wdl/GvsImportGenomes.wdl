@@ -3,11 +3,11 @@ version 1.0
 workflow GvsImportGenomes {
 
   input {
-    Array[File] input_vcfs
-    Array[String] external_sample_names
+    File input_vcf
+    String external_sample_name
     File interval_list
     String output_directory
-    File? sample_map
+    String sample_id
     String project_id
     String dataset_name
     String? pet_schema = "location:INTEGER,sample_id:INTEGER,state:STRING"
@@ -24,47 +24,13 @@ workflow GvsImportGenomes {
   }
 
   String docker_final = select_first([docker, "us.gcr.io/broad-gatk/gatk:4.1.7.0"])
-
-  # return an error if the lengths are not equal
-  Int input_length = length(input_vcfs)
-  if (input_length != length(external_sample_names)) {
-    call TerminateWorkflow {
-      input:
-        message = 'Input array lengths do not match'
-    }
-  }
-
-  call SetLock {
-    input:
-      output_directory = output_directory,
-      service_account_json_path = service_account_json_path,
-      preemptible_tries = preemptible_tries
-  }
-
-  if (defined(sample_map)) {
-    call GetMaxTableIdLegacy {
-      input:
-        sample_map = select_first([sample_map])
-    }
-  }
   
-  if (!defined(sample_map)) {
-    call GetSampleIds {
-      input:
-        external_sample_names = external_sample_names,
-        project_id = project_id,
-        dataset_name = dataset_name,
-        table_name = "sample_info",
-        service_account_json_path = service_account_json_path
-    }
-  }
-
   call CreateTables as CreatePetTables {
   	input:
       project_id = project_id,
       dataset_name = dataset_name,
       datatype = "pet",
-      max_table_id = select_first([GetSampleIds.max_table_id, GetMaxTableIdLegacy.max_table_id]),
+      max_table_id = sample_id,
       schema = pet_schema,
       superpartitioned = "true",
       partitioned = "true",
@@ -79,7 +45,7 @@ workflow GvsImportGenomes {
       project_id = project_id,
       dataset_name = dataset_name,
       datatype = "vet",
-      max_table_id = select_first([GetSampleIds.max_table_id, GetMaxTableIdLegacy.max_table_id]),
+      max_table_id = sample_id,
       schema = vet_schema,
       superpartitioned = "true",
       partitioned = "true",
@@ -89,100 +55,87 @@ workflow GvsImportGenomes {
       docker = docker_final
   }
 
-  call CheckForDuplicateData {
-    input:
-      project_id = project_id,
-      dataset_name = dataset_name,
-      sample_names = external_sample_names,
-      service_account_json_path = service_account_json_path,
-      output_directory = output_directory,
-      run_uuid = SetLock.run_uuid
-  }
+  # call CheckForDuplicateData {
+  #   input:
+  #     project_id = project_id,
+  #     dataset_name = dataset_name,
+  #     sample_name = external_sample_name,
+  #     service_account_json_path = service_account_json_path,
+  #     output_directory = output_directory,
+  # }
 
-  call CreateFOFNs {
-    input:
-        input_vcf_list = write_lines(input_vcfs),
-        sample_name_list = write_lines(external_sample_names),
-        batch_size = batch_size,
-        run_uuid = SetLock.run_uuid
-  }
+  # call CreateFOFNs {
+  #   input:
+  #       input_vcf_list = write_lines(input_vcfs),
+  #       sample_name_list = write_lines(external_sample_names),
+  #       batch_size = batch_size,
+  #       run_uuid = SetLock.run_uuid
+  # }
 
-  scatter (i in range(length(CreateFOFNs.vcf_batch_fofns))) {
     call CreateImportTsvs {
       input:
-        input_vcfs = read_lines(CreateFOFNs.vcf_batch_fofns[i]),
-        sample_names = read_lines(CreateFOFNs.vcf_sample_name_fofns[i]),
+        input_vcf = input_vcf,
+        sample_name = external_sample_name,
+        project_id = project_id,
+        dataset_name = dataset_name,
         interval_list = interval_list,
         service_account_json_path = service_account_json_path,
-        sample_map = select_first([GetSampleIds.sample_map, sample_map]),
         drop_state = drop_state,
         drop_state_includes_greater_than = drop_state_includes_greater_than,
         output_directory = output_directory,
         gatk_override = gatk_override,
         docker = docker_final,
         preemptible_tries = preemptible_tries,
-        run_uuid = SetLock.run_uuid,
-        duplicate_check_passed = CheckForDuplicateData.done
+        # duplicate_check_passed = CheckForDuplicateData.done
     }
-  }
+  
 
-  scatter (i in range(select_first([GetSampleIds.max_table_id, GetMaxTableIdLegacy.max_table_id]))) {
-    call LoadTable as LoadPetTable {
-    input:
-      project_id = project_id,
-      table_id = i + 1,
-      dataset_name = dataset_name,
-      storage_location = output_directory,
-      datatype = "pet",
-      superpartitioned = "true",
-      schema = pet_schema,
-      service_account_json_path = service_account_json_path,
-      table_creation_done = CreatePetTables.done,
-      tsv_creation_done = CreateImportTsvs.done,
-      docker = docker_final,
-      run_uuid = SetLock.run_uuid
-    }
-  }
+  # scatter (i in range(select_first([GetSampleIds.max_table_id, GetMaxTableIdLegacy.max_table_id]))) {
+  #   call LoadTable as LoadPetTable {
+  #   input:
+  #     project_id = project_id,
+  #     table_id = i + 1,
+  #     dataset_name = dataset_name,
+  #     storage_location = output_directory,
+  #     datatype = "pet",
+  #     superpartitioned = "true",
+  #     schema = pet_schema,
+  #     service_account_json_path = service_account_json_path,
+  #     table_creation_done = CreatePetTables.done,
+  #     tsv_creation_done = CreateImportTsvs.done,
+  #     docker = docker_final,
+  #     run_uuid = SetLock.run_uuid
+  #   }
+  # }
 
-  scatter (i in range(select_first([GetSampleIds.max_table_id, GetMaxTableIdLegacy.max_table_id]))) {
-    call LoadTable as LoadVetTable {
-    input:
-      project_id = project_id,
-      table_id = i + 1,
-      dataset_name = dataset_name,
-      storage_location = output_directory,
-      datatype = "vet",
-      superpartitioned = "true",
-      schema = vet_schema,
-      service_account_json_path = service_account_json_path,
-      table_creation_done = CreateVetTables.done,
-      tsv_creation_done = CreateImportTsvs.done,
-      docker = docker_final,
-      run_uuid = SetLock.run_uuid
-    }
-  }
+  # scatter (i in range(select_first([GetSampleIds.max_table_id, GetMaxTableIdLegacy.max_table_id]))) {
+  #   call LoadTable as LoadVetTable {
+  #   input:
+  #     project_id = project_id,
+  #     table_id = i + 1,
+  #     dataset_name = dataset_name,
+  #     storage_location = output_directory,
+  #     datatype = "vet",
+  #     superpartitioned = "true",
+  #     schema = vet_schema,
+  #     service_account_json_path = service_account_json_path,
+  #     table_creation_done = CreateVetTables.done,
+  #     tsv_creation_done = CreateImportTsvs.done,
+  #     docker = docker_final,
+  #     run_uuid = SetLock.run_uuid
+  #   }
+  # }
 
   call SetIsLoadedColumn {
     input:
-      load_vet_done = LoadVetTable.done,
-      load_pet_done = LoadPetTable.done,
+      load_done = CreateImportTsvs.done,
       dataset_name = dataset_name,
-      gvs_ids = select_first([GetSampleIds.gvs_ids, GetMaxTableIdLegacy.gvs_ids]),
+      sample_id = sample_id,
       service_account_json_path = service_account_json_path,
       project_id = project_id,
       preemptible_tries = preemptible_tries
   }
 
-  call ReleaseLock {
-    input:
-      run_uuid = SetLock.run_uuid,
-      output_directory = output_directory,
-      load_sample_info_done = SetIsLoadedColumn.done,
-      load_pet_done = LoadPetTable.done,
-      load_vet_done = LoadVetTable.done,
-      service_account_json_path = service_account_json_path,
-      preemptible_tries = preemptible_tries
-  }
 
   output {
     Boolean loaded_in_gvs = true
@@ -338,7 +291,7 @@ task CheckForDuplicateData {
       String? service_account_json_path
       # needed only for lockfile
       String output_directory
-      String run_uuid
+      # String run_uuid
       # runtime
       Int? preemptible_tries
   }
@@ -358,15 +311,6 @@ task CheckForDuplicateData {
 
     echo "project_id = ~{project_id}" > ~/.bigqueryrc
 
-    # check for existence of the correct lockfile
-    LOCKFILE="~{output_directory}/LOCKFILE"
-    EXISTING_LOCK_ID=$(gsutil cat ${LOCKFILE}) || { echo "Error retrieving lockfile from ${LOCKFILE}" 1>&2 ; exit 1; }
-    CURRENT_RUN_ID="~{run_uuid}"
-
-    if [ "${EXISTING_LOCK_ID}" != "${CURRENT_RUN_ID}" ]; then
-      echo "ERROR: found mismatched lockfile containing run ${EXISTING_LOCK_ID}, which does not match this run ${CURRENT_RUN_ID}." 1>&2
-      exit 1
-    fi
 
     INFO_SCHEMA_TABLE="~{dataset_name}.INFORMATION_SCHEMA.PARTITIONS"
     TEMP_TABLE="~{dataset_name}.sample_dupe_check"
@@ -440,17 +384,19 @@ task CreateFOFNs {
 
 task CreateImportTsvs {
   input {
-    Array[File] input_vcfs
-    Array[String] sample_names
+    File input_vcf
+    String sample_name
+    String project_id
+    String dataset_name
     File interval_list
     String output_directory
-    File sample_map
+    String sample_id
     String? service_account_json_path
     String? drop_state
     Boolean? drop_state_includes_greater_than = false
 
     Boolean call_cache_tsvs = false
-    Boolean duplicate_check_passed
+    # Boolean duplicate_check_passed
 
     # runtime
     Int? preemptible_tries
@@ -458,7 +404,6 @@ task CreateImportTsvs {
     String docker
 
     String? for_testing_only
-    String run_uuid
   }
 
   Int disk_size = if defined(drop_state) then 50 else 75
@@ -471,7 +416,7 @@ task CreateImportTsvs {
   }
 
   parameter_meta {
-    input_vcfs: {
+    input_vcf: {
       localization_optional: true
     }
   }
@@ -491,27 +436,14 @@ task CreateImportTsvs {
       fi
 
 
-      # check for existence of the correct lockfile
-      LOCKFILE="~{output_directory}/LOCKFILE"
-      EXISTING_LOCK_ID=$(gsutil cat ${LOCKFILE}) || { echo "Error retrieving lockfile from ${LOCKFILE}" 1>&2 ; exit 1; }
-      CURRENT_RUN_ID="~{run_uuid}"
-
-      if [ ${EXISTING_LOCK_ID} != ${CURRENT_RUN_ID} ]; then
-        echo "ERROR: found mismatched lockfile containing run ${EXISTING_LOCK_ID}, which does not match this run ${CURRENT_RUN_ID}." 1>&2
-        exit 1
-      fi
-
-      # translate WDL arrays into BASH arrays
-      VCFS_ARRAY=(~{sep=" " input_vcfs})
-      SAMPLE_NAMES_ARRAY=(~{sep=" " sample_names})
 
       # loop over the BASH arrays (See https://stackoverflow.com/questions/6723426/looping-over-arrays-printing-both-index-and-value)
-      for i in "${!VCFS_ARRAY[@]}"; do
-          input_vcf="${VCFS_ARRAY[$i]}"
-          input_vcf_basename=$(basename $input_vcf)
+      # for i in "${!VCFS_ARRAY[@]}"; do
+          # input_vcf="${VCFS_ARRAY[$i]}"
+          input_vcf_basename=$(basename ~{input_vcf})
           updated_input_vcf=$input_vcf
-          input_vcf_index="${VCFS_ARRAY[$i]}.tbi"
-          sample_name="${SAMPLE_NAMES_ARRAY[$i]}"
+          input_vcf_index="${updated_input_vcf}.tbi"
+          # sample_name="${SAMPLE_NAMES_ARRAY[$i]}"
 
           if [ ~{has_service_account_file} = 'true' ]; then
               gsutil cp $input_vcf .
@@ -521,37 +453,37 @@ task CreateImportTsvs {
 
           # check whether these files have already been generated
           DO_TSV_GENERATION='true'
-          if [ ~{call_cache_tsvs} = 'true' ]; then
-            echo "Checking for files to call cache"
+          # if [ ~{call_cache_tsvs} = 'true' ]; then
+          #   echo "Checking for files to call cache"
 
-            declare -a TABLETYPES=("pet" "vet")
-            ALL_FILES_EXIST='true'
-            for TABLETYPE in ${TABLETYPES[@]}; do
-                FILEPATH="~{output_directory}/${TABLETYPE}_tsvs/**${TABLETYPE}_*_${input_vcf_basename}.tsv"
-                # output 1 if no file is found
-                result=$(gsutil ls $FILEPATH || echo 1)
+          #   declare -a TABLETYPES=("pet" "vet")
+          #   ALL_FILES_EXIST='true'
+          #   for TABLETYPE in ${TABLETYPES[@]}; do
+          #       FILEPATH="~{output_directory}/${TABLETYPE}_tsvs/**${TABLETYPE}_*_${input_vcf_basename}.tsv"
+          #       # output 1 if no file is found
+          #       result=$(gsutil ls $FILEPATH || echo 1)
 
-                if [ $result == 1 ]; then
-                  echo "A file matching ${FILEPATH} does not exist"
-                  ALL_FILES_EXIST='false'
-                else
-                  if [[ $result = *"/done/"* ]]; then
-                    echo "File ${FILENAME} seems to have been processed already; found at ${result}"
-                    echo "Something is very wrong!"
-                    exit 1
-                  elif [[ $result = "~{output_directory}/${TABLETYPE}_tsvs/set_"* ]]; then
-                    FILENAME=$(basename $result)
-                    echo "File ${FILENAME} is in a set directory. Moving out of set directory to ~{output_directory}/${TABLETYPE}_tsvs/${FILENAME}"
-                    gsutil mv $result "~{output_directory}/${TABLETYPE}_tsvs/"
-                  fi
-                fi
-            done
+          #       if [ $result == 1 ]; then
+          #         echo "A file matching ${FILEPATH} does not exist"
+          #         ALL_FILES_EXIST='false'
+          #       else
+          #         if [[ $result = *"/done/"* ]]; then
+          #           echo "File ${FILENAME} seems to have been processed already; found at ${result}"
+          #           echo "Something is very wrong!"
+          #           exit 1
+          #         elif [[ $result = "~{output_directory}/${TABLETYPE}_tsvs/set_"* ]]; then
+          #           FILENAME=$(basename $result)
+          #           echo "File ${FILENAME} is in a set directory. Moving out of set directory to ~{output_directory}/${TABLETYPE}_tsvs/${FILENAME}"
+          #           gsutil mv $result "~{output_directory}/${TABLETYPE}_tsvs/"
+          #         fi
+          #       fi
+          #   done
 
-            if [ $ALL_FILES_EXIST = 'true' ]; then
-                DO_TSV_GENERATION='false'
-                echo "Skipping TSV generation for input file ${input_vcf_basename} because the output TSV files already exist."
-            fi
-          fi
+          #   if [ $ALL_FILES_EXIST = 'true' ]; then
+          #       DO_TSV_GENERATION='false'
+          #       echo "Skipping TSV generation for input file ${input_vcf_basename} because the output TSV files already exist."
+          #   fi
+          # fi
 
           if [ $DO_TSV_GENERATION = 'true' ]; then
               echo "Generating TSVs for input file ${input_vcf_basename}"
@@ -562,13 +494,16 @@ task CreateImportTsvs {
                 -L ~{interval_list} \
                 ~{"-IG " + drop_state} \
                 --ignore-above-gq-threshold ~{drop_state_includes_greater_than} \
+                --project-id ~{project_id} \
+                --dataset-name ~{dataset_name} \
+                --output-type BQ \
                 --mode GENOMES \
-                -SN $sample_name \
-                -SNM ~{sample_map} \
+                -SN ~{sample_name} \
+                --gvs_sample_id ~{sample_id} \
                 --ref-version 38
 
-              gsutil -m mv pet_*.tsv ~{output_directory}/pet_tsvs/
-              gsutil -m mv vet_*.tsv ~{output_directory}/vet_tsvs/
+              # gsutil -m mv pet_*.tsv ~{output_directory}/pet_tsvs/
+              # gsutil -m mv vet_*.tsv ~{output_directory}/vet_tsvs/
           fi
       done
 
@@ -827,17 +762,16 @@ task SetIsLoadedColumn {
   }
 
   input {
-    Array[String] load_vet_done
-    Array[String] load_pet_done
+    String load_done
     String dataset_name
     String project_id
-    File gvs_ids
+    String sample_id
     String? service_account_json_path
     Int? preemptible_tries
   }
 
   String has_service_account_file = if (defined(service_account_json_path)) then 'true' else 'false'
-  Array[String] gvs_id_array = read_lines(gvs_ids)
+  # Array[String] gvs_id_array = read_lines(gvs_ids)
 
   command <<<
     set -ex
@@ -852,7 +786,7 @@ task SetIsLoadedColumn {
 
     # set is_loaded to true if there is a corresponding vet table partition with rows for that sample_id
     bq --location=US --project_id=~{project_id} query --format=csv --use_legacy_sql=false \
-    "UPDATE ~{dataset_name}.sample_info SET is_loaded = true WHERE sample_id IN (SELECT CAST(partition_id AS INT64) from ~{dataset_name}.INFORMATION_SCHEMA.PARTITIONS WHERE partition_id in ('~{sep="\',\'" gvs_id_array}') AND total_logical_bytes > 0 AND table_name LIKE \"vet_%\")"
+    "UPDATE ~{dataset_name}.sample_info SET is_loaded = true WHERE sample_id IN (SELECT CAST(partition_id AS INT64) from ~{dataset_name}.INFORMATION_SCHEMA.PARTITIONS WHERE partition_id = sample_id AND total_logical_bytes > 0 AND table_name LIKE \"vet_%\")"
   >>>
 
   runtime {
