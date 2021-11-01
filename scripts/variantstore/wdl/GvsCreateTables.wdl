@@ -3,13 +3,13 @@ version 1.0
 workflow CreateBQTables {
 
     input {
-        String max_table_id
+        Int max_table_id
         String project_id
         String dataset_name
         String? service_account_json_path
         String pet_schema = "location:INTEGER,sample_id:INTEGER,state:STRING"
         String vet_schema = "sample_id:INTEGER,location:INTEGER,ref:STRING,alt:STRING,AS_RAW_MQ:STRING,AS_RAW_MQRankSum:STRING,QUALapprox:STRING,AS_QUALapprox:STRING,AS_RAW_ReadPosRankSum:STRING,AS_SB_TABLE:STRING,AS_VarDP:STRING,call_GT:STRING,call_AD:STRING,call_GQ:INTEGER,call_PGT:STRING,call_PID:STRING,call_PL:STRING"
-        String? uuid
+        String uuid = ""
         Int? preemptible_tries
 
     }
@@ -23,7 +23,7 @@ workflow CreateBQTables {
         schema = pet_schema,
         superpartitioned = "true",
         partitioned = "true",
-        uuid = "",
+        uuid = uuid,
         service_account_json_path = service_account_json_path,
         preemptible_tries = preemptible_tries
     }
@@ -37,40 +37,11 @@ workflow CreateBQTables {
         schema = vet_schema,
         superpartitioned = "true",
         partitioned = "true",
-        uuid = "",
+        uuid = uuid,
         service_account_json_path = service_account_json_path,
         preemptible_tries = preemptible_tries
     }
 }
-
-task GetMaxTableIdLegacy {
-  input {
-    File sample_map
-    Int samples_per_table = 4000
- 
-    # runtime
-    Int? preemptible_tries
-  }
-
-  command <<<
-      set -e
-      cat ~{sample_map} | cut -d"," -f1 > gvs_ids
-      max_sample_id=$(cat gvs_ids | sort -rn | head -1)
-      python -c "from math import ceil; print(ceil($max_sample_id/~{samples_per_table}))"
-  >>>
-  runtime {
-      docker: "python:3.8-slim-buster"
-      memory: "1 GB"
-      disks: "local-disk 10 HDD"
-      preemptible: select_first([preemptible_tries, 5])
-      cpu: 1
-  }
-  output {
-      Int max_table_id = read_int(stdout())
-      File gvs_ids = "gvs_ids"
-  }
-}
-
 
 
 # Creates all the tables necessary for the LoadData operation
