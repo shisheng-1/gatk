@@ -234,9 +234,9 @@ task ExtractAnAcAfFromVCF {
         ## filter out sites with too many alt alleles
         bcftools view -e 'N_ALT>500 || REF~"N"' --no-update ~{local_input_vcf} -Ou | \
         ## filter out the non-passing sites
-        bcftools view  -f 'PASS,.' --no-update -Ou | \
+        bcftools view  -f 'PASS,.' --no-update -Oz -o filtered.vcf.gz
         ## normalize, left align and split multi allelic sites to new lines, remove duplicate lines
-        bcftools norm -m- --check-ref w -f Homo_sapiens_assembly38.fasta -Oz -o normalized.vcf.gz
+        bcftools norm -m- --check-ref w -f Homo_sapiens_assembly38.fasta filtered.vcf.gz -Oz -o normalized.vcf.gz
         rm ~{local_input_vcf}
         ## filter out spanning deletions and variants with an AC of 0
         bcftools view -e 'ALT[0]="*" || AC=0' --no-update normalized.vcf.gz -Ou | \
