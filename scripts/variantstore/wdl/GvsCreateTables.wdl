@@ -10,6 +10,8 @@ workflow CreateBQTables {
         String pet_schema = "location:INTEGER,sample_id:INTEGER,state:STRING"
         String vet_schema = "sample_id:INTEGER,location:INTEGER,ref:STRING,alt:STRING,AS_RAW_MQ:STRING,AS_RAW_MQRankSum:STRING,QUALapprox:STRING,AS_QUALapprox:STRING,AS_RAW_ReadPosRankSum:STRING,AS_SB_TABLE:STRING,AS_VarDP:STRING,call_GT:STRING,call_AD:STRING,call_GQ:INTEGER,call_PGT:STRING,call_PID:STRING,call_PL:STRING"
         String? uuid
+        Int? preemptible_tries
+
     }
 
     call CreateTables as CreatePetTables {
@@ -22,7 +24,8 @@ workflow CreateBQTables {
         superpartitioned = "true",
         partitioned = "true",
         uuid = "",
-        service_account_json_path = service_account_json_path
+        service_account_json_path = service_account_json_path,
+        preemptible_tries = preemptible_tries
     }
 
     call CreateTables as CreateVetTables {
@@ -35,7 +38,8 @@ workflow CreateBQTables {
         superpartitioned = "true",
         partitioned = "true",
         uuid = "",
-        service_account_json_path = service_account_json_path
+        service_account_json_path = service_account_json_path,
+        preemptible_tries = preemptible_tries
     }
 }
 
