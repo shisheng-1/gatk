@@ -26,7 +26,8 @@ workflow GvsImportSample {
       dataset_name = dataset_name,
       sample_name = external_sample_name,
       gvs_sample_id = gvs_sample_id,
-      service_account_json_path = service_account_json_path
+      service_account_json_path = service_account_json_path,
+      preemptible_tries = preemptible_tries
   }
 
     call ImportSample {
