@@ -228,11 +228,11 @@ task ExtractAnAcAfFromVCF {
         # "sas"
         #]
 
-        ## track the dropped variants with +500 alt alleles
-        bcftools view -i 'N_ALT>500' ~{local_input_vcf} | bcftools query -f '%CHROM\t%POS\t%ID\t%REF\t%ALT\n' > track_dropped.tsv
+        ## track the dropped variants with +500 alt alleles or N's in the reference (Since Nirvana cant handle N as a base, drop them for now)
+        bcftools view -i 'N_ALT>500 || REF~"N"' ~{local_input_vcf} | bcftools query -f '%CHROM\t%POS\t%ID\t%REF\t%ALT\n' > track_dropped.tsv
 
         ## filter out sites with too many alt alleles
-        bcftools view -e 'N_ALT>500' --no-update  ~{local_input_vcf} -Ou | \
+        bcftools view -e 'N_ALT>500 || REF~"N"' --no-update ~{local_input_vcf} -Ou | \
         ## filter out the non-passing sites
         bcftools view  -f 'PASS,.' --no-update -Ou | \
         ## normalize, left align and split multi allelic sites to new lines, remove duplicate lines
@@ -331,8 +331,9 @@ task AnnotateVCF {
         CUSTOM_ANNOTATIONS_FOLDER="$PWD/customannotations_dir"
         ## TODO this is a pass thru
 
-        # Add AC/AN/AF as custom annotations
-        dotnet ~{custom_creation_location} customvar --skip-ref\
+        #@ Add AC/AN/AF as custom annotations
+        ## use --skip-ref once you are on a later version of nirvana
+        dotnet ~{custom_creation_location} customvar \
              -r $DATA_SOURCES_FOLDER~{path_reference} \
              -i ~{custom_annotations_file} \
              -o $CUSTOM_ANNOTATIONS_FOLDER
