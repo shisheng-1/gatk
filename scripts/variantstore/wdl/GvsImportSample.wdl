@@ -14,7 +14,7 @@ workflow GvsImportSample {
     Boolean? drop_state_includes_greater_than = false
 
     Int? preemptible_tries
-    File? gatk_override = "gs://broad-dsp-spec-ops/scratch/bigquery-jointcalling/jars/ah_var_store_20210914/gatk-package-4.2.0.0-406-ga9206a2-SNAPSHOT-local.jar"
+    File? gatk_override = "gs://broad-dsp-spec-ops/scratch/andrea/gatk-ah-writeapi.jar"
     String? docker
   }
 
@@ -190,7 +190,7 @@ task ImportSample {
       --output-type BQ \
       --mode GENOMES \
       -SN ~{sample_name} \
-      --gvs_sample_id ~{gvs_sample_id} \
+      --gvs-sample-id ~{gvs_sample_id} \
       --ref-version 38
   >>>
   runtime {
