@@ -126,6 +126,7 @@ task CheckForDuplicateData {
 task ImportSample {
   input {
     File input_vcf
+    # File input_vcf_index
     String sample_name
     String project_id
     String dataset_name
@@ -155,6 +156,9 @@ task ImportSample {
     input_vcf: {
       localization_optional: true
     }
+    input_vcf_index: {
+      localization_optional: true
+    }
   }
   command <<<
     set -e
@@ -170,15 +174,20 @@ task ImportSample {
         gcloud auth activate-service-account --key-file=local.service_account.json
     fi
 
+    # used if we localize the gvcf
     input_vcf_basename=$(basename ~{input_vcf})
-    updated_input_vcf=$input_vcf
-    input_vcf_index="${updated_input_vcf}.tbi"
+
+    # default if we dont manually localize the gvcf
+    updated_input_vcf=~{input_vcf}
 
     if [ ~{has_service_account_file} = 'true' ]; then
-        gsutil cp $input_vcf .
-        gsutil cp $input_vcf_index .
+        gsutil cp ~{input_vcf} .
+        gsutil cp ~{input_vcf}.tbi .
         updated_input_vcf=$input_vcf_basename
     fi
+
+    # do we need this parameter?
+    input_vcf_index="${updated_input_vcf}.tbi"
 
     gatk --java-options "-Xmx7000m" CreateVariantIngestFiles \
       -V ${updated_input_vcf} \
