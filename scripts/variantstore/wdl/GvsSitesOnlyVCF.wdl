@@ -236,14 +236,15 @@ task ExtractAnAcAfFromVCF {
         ## filter out the non-passing sites
         bcftools view  -f 'PASS,.' --no-update -Ou | \
         ## normalize, left align and split multi allelic sites to new lines, remove duplicate lines
-        bcftools norm -m- --check-ref w -f Homo_sapiens_assembly38.fasta -Ou | \
+        bcftools norm -m- --check-ref w -f Homo_sapiens_assembly38.fasta -Oz -o normalized.vcf.gz
+        rm ~{local_input_vcf}
         ## filter out spanning deletions and variants with an AC of 0
-        bcftools view  -e 'ALT[0]="*" || AC=0' --no-update -Ou | \
+        bcftools view -e 'ALT[0]="*" || AC=0' --no-update normalized.vcf.gz -Ou | \
         ## ensure that we respect the FT tag
         bcftools filter -i "FORMAT/FT='PASS,.'" --set-GTs . -Oz -o ~{normalized_vcf}
 
         ## clean up unneeded file
-        rm ~{local_input_vcf}
+        rm normalized.vcf.gz
 
         ## During normalization, sometimes duplicate variamts appear but with different calculations. This seems to be a bug in bcftools. For now we arre dropping all duplicate variants
         ## The say in which this is done is a bit hamfisted and should be optimized in the future.
