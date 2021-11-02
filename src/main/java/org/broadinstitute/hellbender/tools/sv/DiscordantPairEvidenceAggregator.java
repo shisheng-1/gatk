@@ -4,10 +4,6 @@ import htsjdk.samtools.SAMSequenceDictionary;
 import org.broadinstitute.hellbender.engine.FeatureDataSource;
 import org.broadinstitute.hellbender.utils.IntervalUtils;
 import org.broadinstitute.hellbender.utils.SimpleInterval;
-import org.broadinstitute.hellbender.utils.Utils;
-
-import java.util.Collections;
-import java.util.List;
 
 public class DiscordantPairEvidenceAggregator extends SVEvidenceAggregator<DiscordantPairEvidence> {
 
@@ -24,20 +20,8 @@ public class DiscordantPairEvidenceAggregator extends SVEvidenceAggregator<Disco
     }
 
     @Override
-    protected SimpleInterval getEvidenceQueryInterval(final SVCallRecordWithEvidence record) {
+    public SimpleInterval getEvidenceQueryInterval(final SVCallRecord record) {
         return getDiscordantPairStartInterval(record);
-    }
-
-    @Override
-    protected SVCallRecordWithEvidence assignEvidence(final SVCallRecordWithEvidence call, final List<DiscordantPairEvidence> evidence) {
-        Utils.nonNull(call);
-        final SVCallRecordWithEvidence callWithEvidence;
-        if (call.isDepthOnly()) {
-            callWithEvidence = new SVCallRecordWithEvidence(call, call.getStartSplitReadSites(), call.getEndSplitReadSites(), Collections.emptyList(), call.getCopyNumberDistribution());
-        } else {
-            callWithEvidence = new SVCallRecordWithEvidence(call, call.getStartSplitReadSites(), call.getEndSplitReadSites(), evidence, call.getCopyNumberDistribution());
-        }
-        return callWithEvidence;
     }
 
     public int getInnerWindow() {
@@ -49,12 +33,12 @@ public class DiscordantPairEvidenceAggregator extends SVEvidenceAggregator<Disco
     }
 
     @Override
-    protected boolean evidenceFilter(final SVCallRecord record, final DiscordantPairEvidence evidence) {
-        final SimpleInterval startInterval = getDiscordantPairStartInterval(record);
-        final SimpleInterval endInterval = getDiscordantPairEndInterval(record);
+    public boolean evidenceFilter(final SVCallRecord call, final DiscordantPairEvidence evidence) {
+        final SimpleInterval startInterval = getDiscordantPairStartInterval(call);
+        final SimpleInterval endInterval = getDiscordantPairEndInterval(call);
         return discordantPairOverlapsInterval(evidence, startInterval, endInterval)
-                && evidence.getStartStrand() == record.getStrandA()
-                && evidence.getEndStrand() == record.getStrandB();
+                && evidence.getStartStrand() == call.getStrandA()
+                && evidence.getEndStrand() == call.getStrandB();
     }
 
     private SimpleInterval getDiscordantPairStartInterval(final SVCallRecord call) {

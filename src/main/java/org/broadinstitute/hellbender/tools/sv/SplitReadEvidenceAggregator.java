@@ -5,7 +5,6 @@ import htsjdk.samtools.SAMSequenceDictionary;
 import org.broadinstitute.hellbender.engine.FeatureDataSource;
 import org.broadinstitute.hellbender.utils.IntervalUtils;
 import org.broadinstitute.hellbender.utils.SimpleInterval;
-import org.broadinstitute.hellbender.utils.Utils;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -31,12 +30,12 @@ public class SplitReadEvidenceAggregator extends SVEvidenceAggregator<SplitReadE
     }
 
     @Override
-    protected SimpleInterval getEvidenceQueryInterval(final SVCallRecordWithEvidence record) {
-        return (isStart ? record.getPositionAInterval() : record.getPositionBInterval()).expandWithinContig(window, dictionary);
+    public SimpleInterval getEvidenceQueryInterval(final SVCallRecord call) {
+        return (isStart ? call.getPositionAInterval() : call.getPositionBInterval()).expandWithinContig(window, dictionary);
     }
 
     @Override
-    protected boolean evidenceFilter(final SVCallRecord record, final SplitReadEvidence evidence) {
+    public boolean evidenceFilter(final SVCallRecord record, final SplitReadEvidence evidence) {
         if (isStart) {
             return evidence.getStrand() == record.getStrandA();
         } else {
@@ -44,23 +43,7 @@ public class SplitReadEvidenceAggregator extends SVEvidenceAggregator<SplitReadE
         }
     }
 
-    @Override
-    protected SVCallRecordWithEvidence assignEvidence(final SVCallRecordWithEvidence call, final List<SplitReadEvidence> evidence) {
-        Utils.nonNull(call);
-        final SVCallRecordWithEvidence refinedCall;
-        if (call.isDepthOnly()) {
-            refinedCall = call;
-        } else if (isStart) {
-            final List<SplitReadSite> startSitesList = computeSites(evidence);
-            refinedCall = new SVCallRecordWithEvidence(call, startSitesList, call.getEndSplitReadSites(), call.getDiscordantPairs(), call.getCopyNumberDistribution());
-        } else {
-            final List<SplitReadSite> endSitesList = computeSites(evidence);
-            refinedCall = new SVCallRecordWithEvidence(call, call.getStartSplitReadSites(), endSitesList, call.getDiscordantPairs(), call.getCopyNumberDistribution());
-        }
-        return refinedCall;
-    }
-
-    private List<SplitReadSite> computeSites(final List<SplitReadEvidence> evidenceList) {
+    public List<SplitReadSite> computeSites(final List<SplitReadEvidence> evidenceList) {
         if (!Ordering.from(IntervalUtils.getDictionaryOrderComparator(dictionary)).isOrdered(evidenceList)) {
             throw new IllegalArgumentException("Evidence list is not dictionary sorted");
         }

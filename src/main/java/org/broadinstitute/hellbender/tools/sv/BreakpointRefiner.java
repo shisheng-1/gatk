@@ -67,56 +67,55 @@ public class BreakpointRefiner {
     /**
      * Performs breakend refinement for a call
      *
-     * @param call with split read evidence
+     * @param record with split read evidence
      * @return record with new breakpoints
      */
-    public SVCallRecordWithEvidence refineCall(final SVCallRecordWithEvidence call) {
-        Utils.nonNull(call);
-        SVCallRecordUtils.validateCoordinatesWithDictionary(call, dictionary);
+    public SVCallRecord refineCall(final SVCallRecord record, final List<SplitReadSite> startSplitReadSites,
+                                   final List<SplitReadSite> endSplitReadSites) {
+        Utils.nonNull(record);
+        SVCallRecordUtils.validateCoordinatesWithDictionary(record, dictionary);
 
         // Depth-only calls cannot be refined
-        if (call.isDepthOnly()) {
-            return call;
+        if (record.isDepthOnly()) {
+            return record;
         }
 
         // Sample sets
-        final Set<String> callSamples = call.getAllSamples();
-        final Set<String> calledSamples = call.getCarrierSampleSet();
+        final Set<String> callSamples = record.getAllSamples();
+        final Set<String> calledSamples = record.getCarrierSampleSet();
         final Set<String> backgroundSamples = Sets.difference(callSamples, calledSamples);
         final int representativeDepth = computeRepresentativeDepth(callSamples);
 
         // Refine start
-        final SplitReadSite refinedStartSite = getRefinedSite(call.getStartSplitReadSites(), calledSamples,
-                backgroundSamples, representativeDepth, call.getPositionA());
+        final SplitReadSite refinedStartSite = getRefinedSite(startSplitReadSites, calledSamples,
+                backgroundSamples, representativeDepth, record.getPositionA());
 
         // Refine end
-        final int endLowerBound = getEndLowerBound(call, refinedStartSite.getPosition());
-        final int defaultEndPosition = Math.max(endLowerBound, call.getPositionB());
-        final List<SplitReadSite> validEndSites = getValidEndSplitReadSites(call, endLowerBound);
+        final int endLowerBound = getEndLowerBound(record, refinedStartSite.getPosition());
+        final int defaultEndPosition = Math.max(endLowerBound, record.getPositionB());
+        final List<SplitReadSite> validEndSites = getValidEndSplitReadSites(endSplitReadSites, endLowerBound);
         final SplitReadSite refinedEndSite = getRefinedSite(validEndSites, calledSamples, backgroundSamples,
                 representativeDepth, defaultEndPosition);
 
         final int refinedStartPosition = refinedStartSite.getPosition();
         final int refinedEndPosition = refinedEndSite.getPosition();
-        final Integer length = call.getType().equals(StructuralVariantType.INS) ? call.getLength() : null;
+        final Integer length = record.getType().equals(StructuralVariantType.INS) ? record.getLength() : null;
 
         // Create new record
-        return new SVCallRecordWithEvidence(
-                call.getId(), call.getContigA(), refinedStartPosition, call.getStrandA(), call.getContigB(),
-                refinedEndPosition, call.getStrandB(), call.getType(), length, call.getAlgorithms(), call.getAlleles(),
-                call.getGenotypes(), call.getAttributes(), call.getStartSplitReadSites(), call.getEndSplitReadSites(),
-                call.getDiscordantPairs(), call.getCopyNumberDistribution());
+        return new SVCallRecord(record.getId(), record.getContigA(), refinedStartPosition,
+                record.getStrandA(), record.getContigB(), refinedEndPosition, record.getStrandB(), record.getType(),
+                length, record.getAlgorithms(), record.getAlleles(), record.getGenotypes(), record.getAttributes());
     }
 
     /**
      * Filters end sites with position less than lower-bound
      *
-     * @param call
+     * @param endSplitReadSites
      * @param lowerBound min position
      * @return filtered set of end sites
      */
-    private List<SplitReadSite> getValidEndSplitReadSites(final SVCallRecordWithEvidence call, final int lowerBound) {
-        return call.getEndSplitReadSites().stream().filter(s -> s.getPosition() >= lowerBound).collect(Collectors.toList());
+    private List<SplitReadSite> getValidEndSplitReadSites(final List<SplitReadSite> endSplitReadSites, final int lowerBound) {
+        return endSplitReadSites.stream().filter(s -> s.getPosition() >= lowerBound).collect(Collectors.toList());
     }
 
     /**

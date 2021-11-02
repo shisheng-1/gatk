@@ -2,6 +2,7 @@ package org.broadinstitute.hellbender.tools.walkers.sv;
 
 import htsjdk.samtools.SAMSequenceDictionary;
 import htsjdk.samtools.reference.ReferenceSequenceFile;
+import htsjdk.variant.variantcontext.Genotype;
 import htsjdk.variant.variantcontext.GenotypesContext;
 import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.variantcontext.VariantContextBuilder;
@@ -451,7 +452,7 @@ public final class SVCluster extends MultiVariantWalker {
 
     public VariantContext buildVariantContext(final SVCallRecord call) {
         // Add genotypes for missing samples
-        final GenotypesContext filledGenotypes = SVCallRecordUtils.populateGenotypesForMissingSamplesWithAlleles(
+        final List<Genotype> filledGenotypes = SVCallRecordUtils.populateGenotypesForMissingSamplesWithAlleles(
                 call, samples, !defaultNoCall, ploidyTable);
 
         // Assign new variant ID

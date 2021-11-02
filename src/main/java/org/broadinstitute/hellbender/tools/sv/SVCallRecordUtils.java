@@ -427,23 +427,26 @@ public final class SVCallRecordUtils {
     }
 
     // TODO : for a later PR
-    public static VariantContextBuilder createBuilderWithEvidence(final SVCallRecordWithEvidence call, boolean updateSplitRead, boolean updateDiscordantPair) {
+    public static VariantContextBuilder createBuilderWithEvidence(final SVCallRecord call,
+                                                                  final List<DiscordantPairEvidence> discordantPairEvidence,
+                                                                  final List<SplitReadSite> startSplitReadSites,
+                                                                  final List<SplitReadSite> endSplitReadSites) {
         final VariantContextBuilder builder = getVariantBuilder(call);
         final boolean includeEvidence = !call.isDepthOnly();
-        final SplitReadSite startSplitReadCounts = includeEvidence ? getSplitReadCountsAtPosition(call.getStartSplitReadSites(), call.getPositionA()) : null;
-        final SplitReadSite endSplitReadCounts = includeEvidence ? getSplitReadCountsAtPosition(call.getEndSplitReadSites(), call.getPositionB()) : null;
-        final Map<String,Integer> discordantPairCounts = includeEvidence ? getDiscordantPairCountsMap(call.getDiscordantPairs()) : null;
+        final SplitReadSite startSplitReadCounts = includeEvidence ? getSplitReadCountsAtPosition(startSplitReadSites, call.getPositionA()) : null;
+        final SplitReadSite endSplitReadCounts = includeEvidence ? getSplitReadCountsAtPosition(endSplitReadSites, call.getPositionB()) : null;
+        final Map<String,Integer> discordantPairCounts = includeEvidence ? getDiscordantPairCountsMap(discordantPairEvidence) : null;
         final List<Genotype> genotypes = builder.getGenotypes();
         final List<Genotype> newGenotypes = new ArrayList<>(genotypes.size());
         for (final Genotype genotype : genotypes) {
             final String sample = genotype.getSampleName();
             final GenotypeBuilder genotypeBuilder = new GenotypeBuilder(genotype);
             if (includeEvidence) {
-                if (updateSplitRead) {
+                if (startSplitReadSites != null && endSplitReadSites != null) {
                     genotypeBuilder.attribute(GATKSVVCFConstants.START_SPLIT_READ_COUNT_ATTRIBUTE, startSplitReadCounts.getCount(sample));
                     genotypeBuilder.attribute(GATKSVVCFConstants.END_SPLIT_READ_COUNT_ATTRIBUTE, endSplitReadCounts.getCount(sample));
                 }
-                if (updateDiscordantPair) {
+                if (discordantPairEvidence != null) {
                     genotypeBuilder.attribute(GATKSVVCFConstants.DISCORDANT_PAIR_COUNT_ATTRIBUTE, discordantPairCounts.getOrDefault(sample, 0));
                 }
             }

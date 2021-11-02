@@ -272,7 +272,7 @@ public class CanonicalSVCollapser implements SVCollapser<SVCallRecord> {
                                                 final List<Allele> altAlleles) {
         return items.stream()
                 .map(SVCallRecord::getGenotypes)
-                .flatMap(GenotypesContext::stream)
+                .flatMap(List::stream)
                 .collect(Collectors.groupingBy(Genotype::getSampleName))
                 .values()
                 .stream()
