@@ -42,7 +42,7 @@ vat_nirvana_gvs_alleles_dictionary = {
   "gvs_all_an": "AN", # required
   "gvs_all_ac": "AC", # required
   "gvs_all_af": "AF", # required
-  "gvs_all_s_het": "AC_Het" # required
+  ## "gvs_all_s_het": "AC_Het" # required
 }
 
 vat_nirvana_revel_dictionary = {
@@ -270,8 +270,8 @@ def make_annotated_json_row(row_position, row_ref, row_alt, variant_line, transc
       nirvana_gvs_alleles_fieldname = vat_nirvana_gvs_alleles_dictionary.get(vat_gvs_alleles_fieldname)
       gvs_alleles_fieldvalue = gvs_annotations.get(nirvana_gvs_alleles_fieldname)
       row[vat_gvs_alleles_fieldname] = gvs_alleles_fieldvalue
-    row["gvs_all_s_hom"] = int(gvs_annotations.get("AC_Hom") / 2 )
-    row["gvs_all_sc"] = int(gvs_annotations.get("AC_Hom") / 2 ) + gvs_annotations.get('AC_Het')
+    # row["gvs_all_s_hom"] = int(gvs_annotations.get("AC_Hom") / 2 )
+    # row["gvs_all_sc"] = int(gvs_annotations.get("AC_Hom") / 2 ) + gvs_annotations.get('AC_Het')
 
 
     subpopulation_info = get_subpopulation_calculations(gvs_annotations)
