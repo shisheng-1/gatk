@@ -12,7 +12,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class SplitReadEvidenceAggregator extends CachingSVEvidenceAggregator<SplitReadEvidence> {
+public class SplitReadEvidenceAggregator extends SVEvidenceAggregator<SplitReadEvidence> {
 
     private final int window;
     private final boolean isStart; // Retrieve start position split reads, else end position

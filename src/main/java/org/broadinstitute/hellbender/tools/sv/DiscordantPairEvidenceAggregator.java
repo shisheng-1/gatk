@@ -9,7 +9,7 @@ import org.broadinstitute.hellbender.utils.Utils;
 import java.util.Collections;
 import java.util.List;
 
-public class DiscordantPairEvidenceAggregator extends CachingSVEvidenceAggregator<DiscordantPairEvidence> {
+public class DiscordantPairEvidenceAggregator extends SVEvidenceAggregator<DiscordantPairEvidence> {
 
     private final int innerWindow;
     private final int outerWindow;
@@ -82,7 +82,7 @@ public class DiscordantPairEvidenceAggregator extends CachingSVEvidenceAggregato
                 && evidence.getStart() >= startInterval.getStart()
                 && evidence.getStart() < startInterval.getEnd()
                 && evidence.getEndContig().equals(endInterval.getContig())
-                && evidence.getEnd() >= endInterval.getStart()
-                && evidence.getEnd() < endInterval.getEnd();
+                && evidence.getEndPosition() >= endInterval.getStart()
+                && evidence.getEndPosition() < endInterval.getEnd();
     }
 }

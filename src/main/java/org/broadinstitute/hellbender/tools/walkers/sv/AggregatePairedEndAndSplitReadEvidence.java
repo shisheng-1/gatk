@@ -133,9 +133,9 @@ public final class AggregatePairedEndAndSplitReadEvidence extends VariantWalker 
     private FeatureDataSource<SplitReadEvidence> splitReadSource;
     private FeatureDataSource<DiscordantPairEvidence> discordantPairSource;
     private BreakpointRefiner breakpointRefiner;
-    private CachingSVEvidenceAggregator<DiscordantPairEvidence> discordantPairCollector;
-    private CachingSVEvidenceAggregator<SplitReadEvidence> startSplitCollector;
-    private CachingSVEvidenceAggregator<SplitReadEvidence> endSplitCollector;
+    private SVEvidenceAggregator<DiscordantPairEvidence> discordantPairCollector;
+    private SVEvidenceAggregator<SplitReadEvidence> startSplitCollector;
+    private SVEvidenceAggregator<SplitReadEvidence> endSplitCollector;
     private Map<String,Double> sampleCoverageMap;
     private Set<String> samples;
     private VCFHeader header;
@@ -196,12 +196,12 @@ public final class AggregatePairedEndAndSplitReadEvidence extends VariantWalker 
 
     private void initializeSplitReadEvidenceDataSource() {
         splitReadSource = new FeatureDataSource<>(
-                splitReadsFile.toString(),
-                "splitReadsFile",
-                SPLIT_READ_QUERY_LOOKAHEAD,
-                SplitReadEvidence.class,
-                cloudPrefetchBuffer,
-                cloudIndexPrefetchBuffer);
+            splitReadsFile.toString(),
+            "splitReadsFile",
+            SPLIT_READ_QUERY_LOOKAHEAD,
+            SplitReadEvidence.class,
+            cloudPrefetchBuffer,
+            cloudIndexPrefetchBuffer);
     }
 
     private void loadSampleCoverage() {

@@ -16,7 +16,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-public abstract class CachingSVEvidenceAggregator<T extends Feature> {
+public abstract class SVEvidenceAggregator<T extends Feature> {
 
     private final FeatureDataSource<T> source;
     private SimpleInterval cacheInterval;
@@ -26,7 +26,7 @@ public abstract class CachingSVEvidenceAggregator<T extends Feature> {
 
     private static final long RECORDS_BETWEEN_TIME_CHECKS = 100L;
 
-    public CachingSVEvidenceAggregator(final FeatureDataSource<T> source,
+    public SVEvidenceAggregator(final FeatureDataSource<T> source,
                                        final SAMSequenceDictionary dictionary,
                                        final String progressLabel) {
         this.source = source;

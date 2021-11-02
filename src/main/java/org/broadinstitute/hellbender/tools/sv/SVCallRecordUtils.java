@@ -409,7 +409,6 @@ public final class SVCallRecordUtils {
         return alleles.stream().sorted(Comparator.nullsFirst(Comparator.comparing(Allele::getDisplayString))).collect(Collectors.toList());
     }
 
-
     // TODO for a later pr
     public static <T extends SVLocatable> Comparator<T> getSVLocatableComparatorByEnds(final SAMSequenceDictionary dictionary) {
         return (o1, o2) -> compareSVLocatablesByEnds(o1, o2, dictionary);

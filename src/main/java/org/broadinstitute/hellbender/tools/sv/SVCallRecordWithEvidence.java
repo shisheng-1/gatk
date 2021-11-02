@@ -41,7 +41,7 @@ public class SVCallRecordWithEvidence extends SVCallRecord {
                                     final int position2,
                                     final boolean strand2,
                                     final StructuralVariantType type,
-                                    final int length,
+                                    final Integer length,
                                     final List<String> algorithms,
                                     final List<Allele> alleles,
                                     final List<Genotype> genotypes,

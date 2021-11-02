@@ -1,10 +1,10 @@
 package org.broadinstitute.hellbender.tools.sv;
 
+import com.google.common.collect.Sets;
 import htsjdk.samtools.SAMSequenceDictionary;
-import htsjdk.samtools.util.Tuple;
-import htsjdk.variant.variantcontext.Genotype;
 import htsjdk.variant.variantcontext.StructuralVariantType;
 import org.apache.commons.math3.special.Gamma;
+import org.apache.commons.math3.stat.descriptive.rank.Median;
 import org.broadinstitute.hellbender.utils.Utils;
 
 import java.util.*;
@@ -46,6 +46,8 @@ public class BreakpointRefiner {
      */
     private int maxInsertionSplitReadCrossDistance;
 
+    private static final Median MEDIAN = new Median();
+
     public static final int DEFAULT_MAX_INSERTION_CROSS_DISTANCE = 20;
 
     /**
@@ -78,28 +80,25 @@ public class BreakpointRefiner {
         }
 
         // Sample sets
-        final Set<String> backgroundSamples = getBackgroundSamples(call);
-        final Set<String> calledSamples = sampleCoverageMap.keySet().stream()
-                .filter(s -> !backgroundSamples.contains(s)).collect(Collectors.toSet());
+        final Set<String> callSamples = call.getAllSamples();
+        final Set<String> calledSamples = call.getCarrierSampleSet();
+        final Set<String> backgroundSamples = Sets.difference(callSamples, calledSamples);
+        final int representativeDepth = computeRepresentativeDepth(callSamples);
 
         // Refine start
-        final SplitReadSite refinedStartSite = getRefinedSite(call.getStartSplitReadSites(), calledSamples, backgroundSamples, call.getPositionA());
+        final SplitReadSite refinedStartSite = getRefinedSite(call.getStartSplitReadSites(), calledSamples,
+                backgroundSamples, representativeDepth, call.getPositionA());
 
         // Refine end
         final int endLowerBound = getEndLowerBound(call, refinedStartSite.getPosition());
         final int defaultEndPosition = Math.max(endLowerBound, call.getPositionB());
         final List<SplitReadSite> validEndSites = getValidEndSplitReadSites(call, endLowerBound);
-        final SplitReadSite refinedEndSite = getRefinedSite(validEndSites, calledSamples, backgroundSamples, defaultEndPosition);
+        final SplitReadSite refinedEndSite = getRefinedSite(validEndSites, calledSamples, backgroundSamples,
+                representativeDepth, defaultEndPosition);
 
         final int refinedStartPosition = refinedStartSite.getPosition();
         final int refinedEndPosition = refinedEndSite.getPosition();
-        final int length;
-        if (call.getType().equals(StructuralVariantType.DEL) || call.getType().equals(StructuralVariantType.DUP)
-                || call.getType().equals(StructuralVariantType.CNV) || call.getType().equals(StructuralVariantType.INV)) {
-            length = refinedEndPosition - refinedStartPosition;
-        } else {
-            length = call.getLength();
-        }
+        final Integer length = call.getType().equals(StructuralVariantType.INS) ? call.getLength() : null;
 
         // Create new record
         return new SVCallRecordWithEvidence(
@@ -121,20 +120,6 @@ public class BreakpointRefiner {
     }
 
     /**
-     * Gets non-carrier samples
-     *
-     * @param call
-     * @return sample ids
-     */
-    private Set<String> getBackgroundSamples(final SVCallRecord call) {
-        final Set<String> rawCallSamples = call.getGenotypes().stream()
-                .filter(SVCallRecordUtils::isAltGenotype)
-                .map(Genotype::getSampleName)
-                .collect(Collectors.toSet());
-        return sampleCoverageMap.keySet().stream().filter(s -> !rawCallSamples.contains(s)).collect(Collectors.toSet());
-    }
-
-    /**
      * Determines lower-bound on end site position (inclusive). For inter-chromosomal variants, boundaries are at the
      * start of the chromsome (any position is valid). For insertions, {@link BreakpointRefiner#maxInsertionSplitReadCrossDistance}
      * is used to determine how far past the original breakpoint it can be. Otherwise, we just use the new start position.
@@ -153,6 +138,14 @@ public class BreakpointRefiner {
         return refinedStartPosition + 1;
     }
 
+    private int computeRepresentativeDepth(final Collection<String> samples) {
+        double meanCoverage = 0;
+        for (final String s : samples) {
+            meanCoverage += sampleCoverageMap.get(s);
+        }
+        return (int) Math.round(meanCoverage / samples.size());
+    }
+
     /**
      * Performs refinement on one side of a breakpoint
      *
@@ -165,6 +158,7 @@ public class BreakpointRefiner {
     private SplitReadSite getRefinedSite(final List<SplitReadSite> sites,
                                          final Set<String> carrierSamples,
                                          final Set<String> backgroundSamples,
+                                         final int representativeDepth,
                                          final int defaultPosition) {
         Utils.validateArg(sampleCoverageMap.keySet().containsAll(carrierSamples),
                 "One or more carrier samples not found in sample coverage map");
@@ -174,15 +168,21 @@ public class BreakpointRefiner {
         // Default case
         if (sites.isEmpty() || carrierSamples.isEmpty()) return new SplitReadSite(defaultPosition, Collections.emptyMap());
 
-        final long meanCoverage = Math.round(sampleCoverageMap.values().stream().mapToDouble(c -> c).sum()) / sampleCoverageMap.size();
-        final List<Tuple<SplitReadSite,Double>> siteScorePairs = sites.stream()
-                .map(s -> new Tuple<>(s, Double.valueOf(calculateOneSamplePoissonTest(s, carrierSamples, backgroundSamples, meanCoverage))))
-                .collect(Collectors.toList());
-        final double minLogP = siteScorePairs.stream().mapToDouble(p -> p.b).min().getAsDouble();
-        return siteScorePairs.stream()
-                .filter(p -> p.b == minLogP)
-                .min(Comparator.comparingInt(s -> Math.abs(s.a.getPosition() - defaultPosition)))
-                .get().a;
+        Double minLogP = null;
+        Integer minDistance = null;
+        SplitReadSite minSite = null;
+        for (final SplitReadSite s : sites) {
+            final double logP = Double.valueOf(calculateOneSamplePoissonTest(s, carrierSamples, backgroundSamples, representativeDepth));
+            if (minLogP == null || logP <= minLogP) {
+                final int dist = Math.abs(s.getPosition() - defaultPosition);
+                if (minSite == null || dist < minDistance) {
+                    minLogP = logP;
+                    minSite = s;
+                    minDistance = dist;
+                }
+            }
+        }
+        return minSite;
     }
 
     /**
@@ -216,19 +216,12 @@ public class BreakpointRefiner {
      * @return median
      */
     private double getMedianNormalizedCount(final Set<String> samples, final SplitReadSite site) {
-        final Collection<Double> normalizedCounts = samples.stream()
-                .map(s -> site.getCount(s) / sampleCoverageMap.get(s))
-                .collect(Collectors.toList());
-        return median(normalizedCounts);
-    }
-
-    private static double median(final Collection<Double> values) {
-        if (values.isEmpty()) return 0.;
-        final List<Double> sortedValues = values.stream().sorted().collect(Collectors.toList());
-        if (sortedValues.size() % 2 == 1) {
-            return sortedValues.get(sortedValues.size() /2 );
+        final double[] normalizedCounts = new double[samples.size()];
+        int i = 0;
+        for (final String sample : samples) {
+            normalizedCounts[i] = site.getCount(sample) / sampleCoverageMap.get(sample);
         }
-        return 0.5 * (sortedValues.get(sortedValues.size() / 2) + sortedValues.get((sortedValues.size() / 2) - 1));
+        return MEDIAN.evaluate(normalizedCounts);
     }
 
     private static double cumulativePoissonProbability(final double mean, final int x) {
