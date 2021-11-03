@@ -255,20 +255,18 @@ public final class AggregatePairedEndAndSplitReadEvidence extends TwoPassVariant
     @Override
     public void secondPassApply(final VariantContext variant, final ReadsContext readsContext,
                                 final ReferenceContext referenceContext, final FeatureContext featureContext) {
-        final SVCallRecord call = SVCallRecordUtils.create(variant);
+        SVCallRecord call = SVCallRecordUtils.create(variant);
         flushOutputBuffer(call.getPositionAInterval());
-        final List<DiscordantPairEvidence> discordantPairEvidence = discordantPairCollector.collectEvidence(call);
-        final List<SplitReadEvidence> startSplitReadEvidence = startSplitCollector.collectEvidence(call);
-        final List<SplitReadEvidence> endSplitReadEvidence = endSplitCollector.collectEvidence(call);
-        final SVCallRecord refinedCall = breakpointRefiner.refineCall(call,
-                startSplitCollector.computeSites(startSplitReadEvidence),
-                endSplitCollector.computeSites(endSplitReadEvidence));
-        outputBuffer.add(SVCallRecordUtils.createBuilderWithEvidence(
-                refinedCall,
-                discordantPairEvidence,
-                startSplitCollector.computeSites(startSplitReadEvidence),
-                endSplitCollector.computeSites(endSplitReadEvidence)
-        ).make());
+        if (discordantPairCollectionEnabled()) {
+            final List<DiscordantPairEvidence> discordantPairEvidence = discordantPairCollector.collectEvidence(call);
+            call = SVCallRecordUtils.assignDiscordantPairCountsToGenotypes(call, discordantPairEvidence);
+        }
+        if (splitReadCollectionEnabled()) {
+            final List<SplitReadEvidence> startSplitReadEvidence = startSplitCollector.collectEvidence(call);
+            final List<SplitReadEvidence> endSplitReadEvidence = endSplitCollector.collectEvidence(call);
+            call = breakpointRefiner.refineCall(call, startSplitReadEvidence, endSplitReadEvidence);
+        }
+        outputBuffer.add(SVCallRecordUtils.getVariantBuilder(call).make());
         maxOutputBufferSize = Math.max(maxOutputBufferSize, outputBuffer.size());
 
         numVariantsCompleted++;

@@ -10,28 +10,29 @@ import java.util.Map;
 final class SplitReadSite {
     private final int position;
     private final Map<String,Integer> sampleCountsMap;
+    private final Double p;
 
     /**
      * @param position breakpoint position indicated by the split reads
      * @param sampleCountsMap map with (sample id, split read count > 0) entries
      */
-    public SplitReadSite(final int position, final Map<String,Integer> sampleCountsMap) {
+    public SplitReadSite(final int position, final Map<String,Integer> sampleCountsMap, final Double p) {
         Utils.nonNull(sampleCountsMap);
         this.position = position;
         this.sampleCountsMap = sampleCountsMap;
+        this.p = p;
     }
 
     public int getPosition() {
         return position;
     }
 
-    public boolean hasSample(final String sample) {
-        Utils.nonNull(sample);
-        return sampleCountsMap.containsKey(sample);
+    public Double getP() {
+        return p;
     }
 
     public int getCount(final String sample) {
-        if (hasSample(sample)) {
+        if (sampleCountsMap.containsKey(sample)) {
             return sampleCountsMap.get(sample);
         }
         return 0;

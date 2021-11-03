@@ -426,47 +426,20 @@ public final class SVCallRecordUtils {
         return compareB;
     }
 
-    // TODO : for a later PR
-    public static VariantContextBuilder createBuilderWithEvidence(final SVCallRecord call,
-                                                                  final List<DiscordantPairEvidence> discordantPairEvidence,
-                                                                  final List<SplitReadSite> startSplitReadSites,
-                                                                  final List<SplitReadSite> endSplitReadSites) {
-        final VariantContextBuilder builder = getVariantBuilder(call);
-        final boolean includeEvidence = !call.isDepthOnly();
-        final SplitReadSite startSplitReadCounts = includeEvidence ? getSplitReadCountsAtPosition(startSplitReadSites, call.getPositionA()) : null;
-        final SplitReadSite endSplitReadCounts = includeEvidence ? getSplitReadCountsAtPosition(endSplitReadSites, call.getPositionB()) : null;
-        final Map<String,Integer> discordantPairCounts = includeEvidence ? getDiscordantPairCountsMap(discordantPairEvidence) : null;
-        final List<Genotype> genotypes = builder.getGenotypes();
-        final List<Genotype> newGenotypes = new ArrayList<>(genotypes.size());
+    public static SVCallRecord assignDiscordantPairCountsToGenotypes(final SVCallRecord call,
+                                                                     final List<DiscordantPairEvidence> evidence) {
+        final Map<String, Integer> evidenceCounts = evidence.stream()
+                .collect(Collectors.groupingBy(DiscordantPairEvidence::getSample,
+                        Collectors.collectingAndThen(Collectors.toList(), List::size)));
+        final List<Genotype> genotypes = call.getGenotypes();
+        final GenotypesContext newGenotypes = GenotypesContext.create(genotypes.size());
         for (final Genotype genotype : genotypes) {
             final String sample = genotype.getSampleName();
             final GenotypeBuilder genotypeBuilder = new GenotypeBuilder(genotype);
-            if (includeEvidence) {
-                if (startSplitReadSites != null && endSplitReadSites != null) {
-                    genotypeBuilder.attribute(GATKSVVCFConstants.START_SPLIT_READ_COUNT_ATTRIBUTE, startSplitReadCounts.getCount(sample));
-                    genotypeBuilder.attribute(GATKSVVCFConstants.END_SPLIT_READ_COUNT_ATTRIBUTE, endSplitReadCounts.getCount(sample));
-                }
-                if (discordantPairEvidence != null) {
-                    genotypeBuilder.attribute(GATKSVVCFConstants.DISCORDANT_PAIR_COUNT_ATTRIBUTE, discordantPairCounts.getOrDefault(sample, 0));
-                }
-            }
+            genotypeBuilder.attribute(GATKSVVCFConstants.DISCORDANT_PAIR_COUNT_ATTRIBUTE, evidenceCounts.get(sample));
             newGenotypes.add(genotypeBuilder.make());
         }
-        builder.genotypes(newGenotypes);
-        return builder;
-    }
-
-    // TODO for a later pr
-    private static SplitReadSite getSplitReadCountsAtPosition(final List<SplitReadSite> sites, final int pos) {
-        Utils.nonNull(sites);
-        Utils.validateArg(pos > 0, "Non-positive position");
-        if (sites.stream().map(SplitReadSite::getPosition).distinct().count() != sites.size()) {
-            throw new IllegalArgumentException("Sites did not have unique positions");
-        }
-        return sites.stream()
-                .filter(s -> s.getPosition() == pos)
-                .findAny()
-                .orElse(new SplitReadSite(pos, Collections.emptyMap()));
+        return SVCallRecordUtils.copyCallWithNewGenotypes(call, newGenotypes);
     }
 
     // TODO for a later pr

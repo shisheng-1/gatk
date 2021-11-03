@@ -67,9 +67,8 @@ public class BreakpointRefinerTest {
             }
             samples.add(sample);
         }
-        final SplitReadSite site = new SplitReadSite(1000, sampleCountsMap);
 
-        final double test = BreakpointRefiner.getMedianNormalizedCount(samples, site, sampleCoverageMap);
+        final double test = BreakpointRefiner.getMedianNormalizedCount(samples, sampleCountsMap, sampleCoverageMap);
         Assert.assertTrue(Math.abs(test - expected) <= ERROR_TOL);
     }
 
