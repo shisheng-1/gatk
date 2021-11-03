@@ -409,23 +409,6 @@ public final class SVCallRecordUtils {
         return alleles.stream().sorted(Comparator.nullsFirst(Comparator.comparing(Allele::getDisplayString))).collect(Collectors.toList());
     }
 
-    // TODO for a later pr
-    public static <T extends SVLocatable> Comparator<T> getSVLocatableComparatorByEnds(final SAMSequenceDictionary dictionary) {
-        return (o1, o2) -> compareSVLocatablesByEnds(o1, o2, dictionary);
-    }
-
-    // TODO for a later pr
-    public static int compareSVLocatablesByEnds(final SVLocatable first, final SVLocatable second, final SAMSequenceDictionary dictionary) {
-        Utils.nonNull(first);
-        Utils.nonNull(second);
-        // First locus
-        final Comparator<Locatable> locatableComparator = IntervalUtils.getDictionaryOrderComparator(dictionary);
-        // Second locus
-        final int compareB = locatableComparator.compare(new SimpleInterval(first.getContigB(), first.getPositionB(), first.getPositionB()),
-                new SimpleInterval(second.getContigB(), second.getPositionB(), second.getPositionB()));
-        return compareB;
-    }
-
     public static SVCallRecord assignDiscordantPairCountsToGenotypes(final SVCallRecord call,
                                                                      final List<DiscordantPairEvidence> evidence) {
         final Map<String, Integer> evidenceCounts = evidence.stream()
@@ -440,14 +423,6 @@ public final class SVCallRecordUtils {
             newGenotypes.add(genotypeBuilder.make());
         }
         return SVCallRecordUtils.copyCallWithNewGenotypes(call, newGenotypes);
-    }
-
-    // TODO for a later pr
-    private static Map<String,Integer> getDiscordantPairCountsMap(final Collection<DiscordantPairEvidence> discordantPairs) {
-        Utils.nonNull(discordantPairs);
-        return discordantPairs.stream()
-                .collect(Collectors.groupingBy(DiscordantPairEvidence::getSample,
-                        Collectors.reducing(0, e -> 1, Integer::sum)));
     }
 
     // TODO for a future pr
