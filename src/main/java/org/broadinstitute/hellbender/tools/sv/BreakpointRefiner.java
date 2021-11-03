@@ -1,10 +1,15 @@
 package org.broadinstitute.hellbender.tools.sv;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Sets;
 import htsjdk.samtools.SAMSequenceDictionary;
 import htsjdk.variant.variantcontext.StructuralVariantType;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.math3.special.Gamma;
 import org.apache.commons.math3.stat.descriptive.rank.Median;
+import org.broadinstitute.hellbender.tools.spark.sv.utils.GATKSVVCFConstants;
+import org.broadinstitute.hellbender.utils.QualityUtils;
 import org.broadinstitute.hellbender.utils.Utils;
 
 import java.util.*;
@@ -49,6 +54,7 @@ public class BreakpointRefiner {
     private static final Median MEDIAN = new Median();
 
     public static final int DEFAULT_MAX_INSERTION_CROSS_DISTANCE = 20;
+    public static final int MAX_SR_QUALITY = 99;
 
     /**
      * @param sampleCoverageMap map with (sample id, per-base sample coverage) entries
@@ -87,24 +93,38 @@ public class BreakpointRefiner {
         final int representativeDepth = computeRepresentativeDepth(callSamples);
 
         // Refine start
-        final SplitReadSite refinedStartSite = getRefinedSite(startSplitReadSites, calledSamples,
+        final Pair<SplitReadSite, Double> startResult = getRefinedSite(startSplitReadSites, calledSamples,
                 backgroundSamples, representativeDepth, record.getPositionA());
+        final SplitReadSite refinedStartSite = startResult.getLeft();
+        final Double startP = startResult.getRight();
 
         // Refine end
         final int endLowerBound = getEndLowerBound(record, refinedStartSite.getPosition());
         final int defaultEndPosition = Math.max(endLowerBound, record.getPositionB());
         final List<SplitReadSite> validEndSites = getValidEndSplitReadSites(endSplitReadSites, endLowerBound);
-        final SplitReadSite refinedEndSite = getRefinedSite(validEndSites, calledSamples, backgroundSamples,
+        final Pair<SplitReadSite, Double> endResult = getRefinedSite(validEndSites, calledSamples, backgroundSamples,
                 representativeDepth, defaultEndPosition);
+        final SplitReadSite refinedEndSite = endResult.getLeft();
+        final Double endP = endResult.getRight();
 
         final int refinedStartPosition = refinedStartSite.getPosition();
         final int refinedEndPosition = refinedEndSite.getPosition();
         final Integer length = record.getType().equals(StructuralVariantType.INS) ? record.getLength() : null;
 
+        final Integer startQuality = probToQual(startP);
+        final Integer endQuality = probToQual(endP);
+        final Map<String, Object> refinedAttr = new HashMap<>(record.getAttributes());
+        refinedAttr.put(GATKSVVCFConstants.START_SPLIT_QUALITY_ATTRIBUTE, startQuality);
+        refinedAttr.put(GATKSVVCFConstants.END_SPLIT_QUALITY_ATTRIBUTE, endQuality);
+
         // Create new record
         return new SVCallRecord(record.getId(), record.getContigA(), refinedStartPosition,
                 record.getStrandA(), record.getContigB(), refinedEndPosition, record.getStrandB(), record.getType(),
-                length, record.getAlgorithms(), record.getAlleles(), record.getGenotypes(), record.getAttributes());
+                length, record.getAlgorithms(), record.getAlleles(), record.getGenotypes(), refinedAttr);
+    }
+
+    private static Integer probToQual(final Double pError) {
+        return pError == null ? null : (int) QualityUtils.errorProbToQual(pError, MAX_SR_QUALITY);
     }
 
     /**
@@ -151,37 +171,39 @@ public class BreakpointRefiner {
      * @param sites sites to test
      * @param carrierSamples carrier sample ids
      * @param backgroundSamples background sample ids
-     * @param defaultPosition position to use if test cannot be performed (no sites or no carriers)
-     * @return site with refined breakpoints
+     * @param defaultPosition position to use if test cannot be performed (no sites or carriers)
+     * @return pair containing site with refined breakpoints and probability (null if no sites or carriers)
      */
-    private SplitReadSite getRefinedSite(final List<SplitReadSite> sites,
-                                         final Set<String> carrierSamples,
-                                         final Set<String> backgroundSamples,
-                                         final int representativeDepth,
-                                         final int defaultPosition) {
+    private Pair<SplitReadSite, Double> getRefinedSite(final List<SplitReadSite> sites,
+                                                      final Set<String> carrierSamples,
+                                                      final Set<String> backgroundSamples,
+                                                      final int representativeDepth,
+                                                      final int defaultPosition) {
         Utils.validateArg(sampleCoverageMap.keySet().containsAll(carrierSamples),
                 "One or more carrier samples not found in sample coverage map");
         Utils.validateArg(sampleCoverageMap.keySet().containsAll(backgroundSamples),
                 "One or more non-carrier samples not found in sample coverage map");
 
         // Default case
-        if (sites.isEmpty() || carrierSamples.isEmpty()) return new SplitReadSite(defaultPosition, Collections.emptyMap());
+        if (sites.isEmpty() || carrierSamples.isEmpty()) {
+            return new ImmutablePair<>(new SplitReadSite(defaultPosition, Collections.emptyMap()), null);
+        }
 
-        Double minLogP = null;
+        Double minP = null;
         Integer minDistance = null;
         SplitReadSite minSite = null;
         for (final SplitReadSite s : sites) {
-            final double logP = Double.valueOf(calculateOneSamplePoissonTest(s, carrierSamples, backgroundSamples, representativeDepth));
-            if (minLogP == null || logP <= minLogP) {
+            final double p = Double.valueOf(calculateOneSamplePoissonTest(s, carrierSamples, backgroundSamples, representativeDepth));
+            if (minP == null || p <= minP) {
                 final int dist = Math.abs(s.getPosition() - defaultPosition);
                 if (minSite == null || dist < minDistance) {
-                    minLogP = logP;
+                    minP = p;
                     minSite = s;
                     minDistance = dist;
                 }
             }
         }
-        return minSite;
+        return new ImmutablePair<>(minSite, minP);
     }
 
     /**
@@ -198,11 +220,11 @@ public class BreakpointRefiner {
                                                  final Set<String> carrierSamples,
                                                  final Set<String> backgroundSamples,
                                                  final double meanCoverage) {
-        final double medianNormalizedCarrierCount = getMedianNormalizedCount(carrierSamples, site);
+        final double medianNormalizedCarrierCount = getMedianNormalizedCount(carrierSamples, site, sampleCoverageMap);
         if (medianNormalizedCarrierCount == 0) {
-            return 1;  // Degenerate case in which the Poisson distribution is undefined
+            return 1.;  // Degenerate case in which the Poisson distribution is undefined
         }
-        final double medianBackgroundRate = getMedianNormalizedCount(backgroundSamples, site);
+        final double medianBackgroundRate = getMedianNormalizedCount(backgroundSamples, site, sampleCoverageMap);
         final int backgroundCount = (int) Math.round(medianBackgroundRate * meanCoverage);
         return cumulativePoissonProbability(meanCoverage * medianNormalizedCarrierCount, backgroundCount);
     }
@@ -214,16 +236,21 @@ public class BreakpointRefiner {
      * @param site
      * @return median
      */
-    private double getMedianNormalizedCount(final Set<String> samples, final SplitReadSite site) {
+    @VisibleForTesting
+    protected static double getMedianNormalizedCount(final Set<String> samples,
+                                                   final SplitReadSite site,
+                                                   final Map<String, Double> sampleCoverageMap) {
         final double[] normalizedCounts = new double[samples.size()];
         int i = 0;
         for (final String sample : samples) {
             normalizedCounts[i] = site.getCount(sample) / sampleCoverageMap.get(sample);
+            i++;
         }
         return MEDIAN.evaluate(normalizedCounts);
     }
 
-    private static double cumulativePoissonProbability(final double mean, final int x) {
+    @VisibleForTesting
+    protected static double cumulativePoissonProbability(final double mean, final int x) {
         if (x < 0) {
             return 0;
         }

@@ -17,7 +17,6 @@ final class SplitReadSite {
      */
     public SplitReadSite(final int position, final Map<String,Integer> sampleCountsMap) {
         Utils.nonNull(sampleCountsMap);
-        Utils.validateArg(sampleCountsMap.values().stream().allMatch(c -> c > 0), "Non-positive counts not allowed");
         this.position = position;
         this.sampleCountsMap = sampleCountsMap;
     }

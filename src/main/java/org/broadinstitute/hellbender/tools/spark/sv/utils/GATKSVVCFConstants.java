@@ -94,6 +94,8 @@ public final class GATKSVVCFConstants {
 
     public static final String START_SPLIT_READ_COUNT_ATTRIBUTE = "SR1";
     public static final String END_SPLIT_READ_COUNT_ATTRIBUTE = "SR2";
+    public static final String START_SPLIT_QUALITY_ATTRIBUTE = "SR1Q";
+    public static final String END_SPLIT_QUALITY_ATTRIBUTE = "SR2Q";
     public static final String DISCORDANT_PAIR_COUNT_ATTRIBUTE = "PE";
 
     // filter block
