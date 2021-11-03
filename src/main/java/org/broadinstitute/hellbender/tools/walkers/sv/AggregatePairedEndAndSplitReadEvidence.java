@@ -132,6 +132,7 @@ public final class AggregatePairedEndAndSplitReadEvidence extends TwoPassVariant
     private FeatureDataSource<SplitReadEvidence> splitReadSource;
     private FeatureDataSource<DiscordantPairEvidence> discordantPairSource;
     private BreakpointRefiner breakpointRefiner;
+    private DiscordantPairEvidenceTester discordantPairEvidenceTester;
     private DiscordantPairEvidenceAggregator discordantPairCollector;
     private SplitReadEvidenceAggregator startSplitCollector;
     private SplitReadEvidenceAggregator endSplitCollector;
@@ -159,10 +160,10 @@ public final class AggregatePairedEndAndSplitReadEvidence extends TwoPassVariant
             throw new UserException("Reference sequence dictionary required");
         }
         samples = new LinkedHashSet<>(getHeaderForVariants().getSampleNamesInOrder());
-
         if (!splitReadCollectionEnabled() && !discordantPairCollectionEnabled()) {
             throw new UserException.BadInput("At least one evidence file must be provided");
         }
+        loadSampleCoverage();
         if (discordantPairCollectionEnabled()) {
             initializeDiscordantPairCollection();
         }
@@ -180,6 +181,7 @@ public final class AggregatePairedEndAndSplitReadEvidence extends TwoPassVariant
     private void initializeDiscordantPairCollection() {
         initializeDiscordantPairDataSource();
         discordantPairCollector = new DiscordantPairEvidenceAggregator(discordantPairSource, dictionary, innerWindow, outerWindow);
+        discordantPairEvidenceTester = new DiscordantPairEvidenceTester(sampleCoverageMap, dictionary);
     }
 
     private void initializeSplitReadCollection() {
@@ -189,7 +191,6 @@ public final class AggregatePairedEndAndSplitReadEvidence extends TwoPassVariant
         initializeSplitReadEvidenceDataSource();
         startSplitCollector = new SplitReadEvidenceAggregator(splitReadSource, dictionary, splitReadWindow, true);
         endSplitCollector = new SplitReadEvidenceAggregator(splitReadSource, dictionary, splitReadWindow, false);
-        loadSampleCoverage();
         breakpointRefiner = new BreakpointRefiner(sampleCoverageMap, dictionary);
     }
 
@@ -259,6 +260,9 @@ public final class AggregatePairedEndAndSplitReadEvidence extends TwoPassVariant
         flushOutputBuffer(call.getPositionAInterval());
         if (discordantPairCollectionEnabled()) {
             final List<DiscordantPairEvidence> discordantPairEvidence = discordantPairCollector.collectEvidence(call);
+            final Double p = discordantPairEvidenceTester.poissonTestRecord(call, discordantPairEvidence);
+            final Integer q = EvidenceStatUtils.probToQual(p, (byte) 99);
+            call = SVCallRecordUtils.copyCallWithNewAttribute(call, GATKSVVCFConstants.DISCORDANT_PAIR_QUALITY_ATTRIBUTE, q);
             call = SVCallRecordUtils.assignDiscordantPairCountsToGenotypes(call, discordantPairEvidence);
         }
         if (splitReadCollectionEnabled()) {
@@ -313,6 +317,7 @@ public final class AggregatePairedEndAndSplitReadEvidence extends TwoPassVariant
         }
         if (discordantPairCollectionEnabled()) {
             header.addMetaDataLine(new VCFFormatHeaderLine(GATKSVVCFConstants.DISCORDANT_PAIR_COUNT_ATTRIBUTE, 1, VCFHeaderLineType.Integer, "Discordant pair count"));
+            header.addMetaDataLine(new VCFInfoHeaderLine(GATKSVVCFConstants.DISCORDANT_PAIR_QUALITY_ATTRIBUTE, 1, VCFHeaderLineType.Integer, "Discordant pair quality"));
         }
         return header;
     }

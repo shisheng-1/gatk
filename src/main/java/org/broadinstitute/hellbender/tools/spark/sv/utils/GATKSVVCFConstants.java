@@ -97,6 +97,7 @@ public final class GATKSVVCFConstants {
     public static final String START_SPLIT_QUALITY_ATTRIBUTE = "SR1Q";
     public static final String END_SPLIT_QUALITY_ATTRIBUTE = "SR2Q";
     public static final String DISCORDANT_PAIR_COUNT_ATTRIBUTE = "PE";
+    public static final String DISCORDANT_PAIR_QUALITY_ATTRIBUTE = "PEQ";
 
     // filter block
     public static final String ASSEMBLY_BASED_VARIANT_MQ_FILTER_KEY = "LOW_MQ";

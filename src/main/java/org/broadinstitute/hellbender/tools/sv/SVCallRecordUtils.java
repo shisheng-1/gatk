@@ -146,6 +146,21 @@ public final class SVCallRecordUtils {
     }
 
     /**
+     * Creates shallow copy of the given record with an extra attribute.
+     * @param record base record
+     * @param key new key
+     * @param value new value
+     * @return new record
+     */
+    public static SVCallRecord copyCallWithNewAttribute(final SVCallRecord record, final String key, final Object value) {
+        final Map<String, Object> attr = new HashMap<>(record.getAttributes());
+        attr.put(key, value);
+        return new SVCallRecord(record.getId(), record.getContigA(), record.getPositionA(), record.getStrandA(), record.getContigB(),
+                record.getPositionB(), record.getStrandB(), record.getType(), record.getLength(), record.getAlgorithms(), record.getAlleles(),
+                record.getGenotypes(), attr);
+    }
+
+    /**
      * Get string representation for the given record's strands.
      */
     private static String getStrandString(final SVCallRecord record) {
@@ -417,9 +432,9 @@ public final class SVCallRecordUtils {
         final List<Genotype> genotypes = call.getGenotypes();
         final GenotypesContext newGenotypes = GenotypesContext.create(genotypes.size());
         for (final Genotype genotype : genotypes) {
-            final String sample = genotype.getSampleName();
             final GenotypeBuilder genotypeBuilder = new GenotypeBuilder(genotype);
-            genotypeBuilder.attribute(GATKSVVCFConstants.DISCORDANT_PAIR_COUNT_ATTRIBUTE, evidenceCounts.get(sample));
+            genotypeBuilder.attribute(GATKSVVCFConstants.DISCORDANT_PAIR_COUNT_ATTRIBUTE,
+                    evidenceCounts.getOrDefault(genotype.getSampleName(), 0));
             newGenotypes.add(genotypeBuilder.make());
         }
         return SVCallRecordUtils.copyCallWithNewGenotypes(call, newGenotypes);
