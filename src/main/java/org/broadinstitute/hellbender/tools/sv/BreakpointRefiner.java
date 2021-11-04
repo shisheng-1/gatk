@@ -42,6 +42,7 @@ public class BreakpointRefiner {
 
     private final Map<String,Double> sampleCoverageMap;
     private final SAMSequenceDictionary dictionary;
+    private final double backgroundRate;
     /**
      * Number bases that insertion split read positions can pass by the original breakpoint, when left-clipped
      * reads are to the left of the breakpoint and right-clipped reads to the right.
@@ -55,10 +56,65 @@ public class BreakpointRefiner {
      * @param sampleCoverageMap map with (sample id, per-base sample coverage) entries
      * @param dictionary reference dictionary
      */
-    public BreakpointRefiner(final Map<String,Double> sampleCoverageMap, final SAMSequenceDictionary dictionary) {
+    public BreakpointRefiner(final Map<String,Double> sampleCoverageMap, final SAMSequenceDictionary dictionary,
+                             final double backgroundRate) {
         this.sampleCoverageMap = Utils.nonNull(sampleCoverageMap);
         this.dictionary = Utils.nonNull(dictionary);
+        this.backgroundRate = backgroundRate;
         setMaxInsertionSplitReadCrossDistance(DEFAULT_MAX_INSERTION_CROSS_DISTANCE);
+    }
+
+    /**
+     * Performs refinement on one side of a breakpoint
+     *
+     * @param sortedEvidence split read evidence to test, sorted by position
+     * @param carrierSamples carrier sample ids
+     * @param backgroundSamples background sample ids
+     * @param defaultPosition position to use if test cannot be performed (no evidence or carriers)
+     * @return pair containing site with refined breakpoints and probability (null if no evidence or carriers)
+     */
+    public static SplitReadSite refineSplitReadSite(final List<SplitReadEvidence> sortedEvidence,
+                                                    final Collection<String> carrierSamples,
+                                                    final Collection<String> backgroundSamples,
+                                                    final Map<String, Double> sampleCoverageMap,
+                                                    final int representativeDepth,
+                                                    final int defaultPosition,
+                                                    final double backgroundRate) {
+        Utils.validateArg(sampleCoverageMap.keySet().containsAll(carrierSamples),
+                "One or more carrier samples not found in sample coverage map");
+        Utils.validateArg(sampleCoverageMap.keySet().containsAll(backgroundSamples),
+                "One or more non-carrier samples not found in sample coverage map");
+
+        // Default case
+        if (sortedEvidence.isEmpty() || carrierSamples.isEmpty()) {
+            return new SplitReadSite(defaultPosition, Collections.emptyMap(), null);
+        }
+
+        Double minP = null;
+        Integer minDistance = null;
+        Integer minPosition = null;
+        Map<String,Integer> minSampleCounts = null;
+        int position = 0;
+        Map<String,Integer> sampleCounts = new HashMap<>();
+        for (final SplitReadEvidence e : sortedEvidence) {
+            if (e.getStart() != position) {
+                final double p = EvidenceStatUtils.calculateOneSamplePoissonTest(
+                        sampleCounts, carrierSamples, backgroundSamples, sampleCoverageMap, representativeDepth, backgroundRate);
+                if (minP == null || p <= minP) {
+                    final int dist = Math.abs(position - defaultPosition);
+                    if (minPosition == null || dist < minDistance) {
+                        minP = p;
+                        minPosition = position;
+                        minDistance = dist;
+                        minSampleCounts = sampleCounts;
+                    }
+                }
+                sampleCounts = new HashMap<>();
+                position = e.getStart();
+            }
+            sampleCounts.put(e.getSample(), e.getCount());
+        }
+        return new SplitReadSite(minPosition, minSampleCounts, minP);
     }
 
     public void setMaxInsertionSplitReadCrossDistance(final int distance) {
@@ -71,7 +127,8 @@ public class BreakpointRefiner {
      * @param record with split read evidence
      * @return record with new breakpoints
      */
-    public SVCallRecord refineCall(final SVCallRecord record, final List<SplitReadEvidence> startEvidence,
+    public SVCallRecord refineCall(final SVCallRecord record,
+                                   final List<SplitReadEvidence> startEvidence,
                                    final List<SplitReadEvidence> endEvidence) {
         Utils.nonNull(record);
         SVCallRecordUtils.validateCoordinatesWithDictionary(record, dictionary);
@@ -88,15 +145,15 @@ public class BreakpointRefiner {
         final int representativeDepth = EvidenceStatUtils.computeRepresentativeDepth(sampleCoverageMap.values());
 
         // Refine start
-        final SplitReadSite refinedStartSite = EvidenceStatUtils.refineSplitReadSite(startEvidence, calledSamples,
-                backgroundSamples, sampleCoverageMap, representativeDepth, record.getPositionA());
+        final SplitReadSite refinedStartSite = refineSplitReadSite(startEvidence, calledSamples,
+                backgroundSamples, sampleCoverageMap, representativeDepth, record.getPositionA(), backgroundRate);
 
         // Refine end
         final int endLowerBound = getEndLowerBound(record, refinedStartSite.getPosition());
         final int defaultEndPosition = Math.max(endLowerBound, record.getPositionB());
         final List<SplitReadEvidence> validEndEvidence = getValidEndSplitReadSites(endEvidence, endLowerBound);
-        final SplitReadSite refinedEndSite = EvidenceStatUtils.refineSplitReadSite(validEndEvidence, calledSamples,
-                backgroundSamples, sampleCoverageMap, representativeDepth, defaultEndPosition);
+        final SplitReadSite refinedEndSite = refineSplitReadSite(validEndEvidence, calledSamples,
+                backgroundSamples, sampleCoverageMap, representativeDepth, defaultEndPosition, backgroundRate);
 
         final int refinedStartPosition = refinedStartSite.getPosition();
         final int refinedEndPosition = refinedEndSite.getPosition();
