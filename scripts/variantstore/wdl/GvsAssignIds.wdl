@@ -76,6 +76,7 @@ task AssignIds {
 
   command <<<
       set -e
+      set -x
 
       # make sure that sample names were actually passed, fail if empty
       num_samples=~{length(sample_names)}
@@ -127,8 +128,7 @@ task AssignIds {
       echo "entity:sample_id,gvs_id" > update.tsv
       bq --project_id=~{project_id} query --format=csv --use_legacy_sql=false -n $num_samples \
         "SELECT sample_name, sample_id from ~{dataset_name}.~{sample_info_table} WHERE sample_id >= $offset" > update.tsv
-      sed -i '.bu1' 's/sample_id/gvs_id/' update.tsv
-      sed -i '.bu2' 's/sample_name/entity:sample_id/' update.tsv
+      sed -i '\.bu' -e 's/sample_id/gvs_id/' -e 's/sample_name/entity:sample_id/' -e 's/,/\t/g' update.tsv
 
       # remove the lock table
       bq --project_id=~{project_id} rm -f -t ~{dataset_name}.sample_id_assignment_lock
