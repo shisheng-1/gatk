@@ -128,7 +128,7 @@ task AssignIds {
       echo "entity:sample_id,gvs_id" > update.tsv
       bq --project_id=~{project_id} query --format=csv --use_legacy_sql=false -n $num_samples \
         "SELECT sample_name, sample_id from ~{dataset_name}.~{sample_info_table} WHERE sample_id >= $offset" > update.tsv
-      sed -i '\.bu' -e 's/sample_id/gvs_id/' -e 's/sample_name/entity:sample_id/' -e 's/,/\t/g' update.tsv
+      cat update.tsv | sed -e 's/sample_id/gvs_id/' -e 's/sample_name/entity:sample_id/' -e 's/,/\t/g' > gvs_ids.tsv
 
       # remove the lock table
       bq --project_id=~{project_id} rm -f -t ~{dataset_name}.sample_id_assignment_lock
@@ -149,7 +149,7 @@ task AssignIds {
       cpu: 1
   }
   output {
-    File gvs_ids = "update.tsv"
+    File gvs_ids = "gvs_ids.tsv"
   }
 }
 
