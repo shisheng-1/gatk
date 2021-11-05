@@ -47,6 +47,7 @@ workflow GvsAssignIds {
 
   output {
     Boolean gvs_ids_created = true
+    File updates = AssignIds.gvs_ids
   }
 }
 
@@ -135,7 +136,10 @@ task AssignIds {
       # update the data model
       python3 <<CODE
         from firecloud import api as fapi
-        fapi.update_entities_tsv(~{workspace_namespace}, ~{workspace_name}, update.tsv)
+        response = fapi.update_entities_tsv(~{workspace_namespace}, ~{workspace_name}, 'update.tsv', 'flexible')
+        if response.status_code != 200:
+          print(response.status_code)
+          print(response.text)
       CODE
   >>>
   runtime {
