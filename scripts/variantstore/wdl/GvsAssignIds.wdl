@@ -135,11 +135,11 @@ task AssignIds {
 
       # update the data model
       python3 <<CODE
-        from firecloud import api as fapi
-        response = fapi.update_entities_tsv(~{workspace_namespace}, ~{workspace_name}, 'update.tsv', 'flexible')
-        if response.status_code != 200:
-          print(response.status_code)
-          print(response.text)
+from firecloud import api as fapi
+response = fapi.update_entities_tsv(~{workspace_namespace}, ~{workspace_name}, 'update.tsv', 'flexible')
+if response.status_code != 200:
+  print(response.status_code)
+  print(response.text)
       CODE
   >>>
   runtime {
