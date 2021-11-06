@@ -140,7 +140,7 @@ response = fapi.update_entities_tsv(~{workspace_namespace}, ~{workspace_name}, '
 if response.status_code != 200:
   print(response.status_code)
   print(response.text)
-      CODE
+CODE
   >>>
   runtime {
       docker: docker
