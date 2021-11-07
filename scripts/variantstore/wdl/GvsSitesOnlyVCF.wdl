@@ -229,12 +229,12 @@ task ExtractAnAcAfFromVCF {
         #]
 
         ## track the dropped variants with +10 alt alleles or N's in the reference (Since Nirvana cant handle N as a base, drop them for now)
-        bcftools view -i 'N_ALT>10 || REF~"N"' ~{local_input_vcf} | bcftools query -f '%CHROM\t%POS\t%ID\t%REF\t%ALT\n' > track_dropped.tsv
+        bcftools view -i 'N_ALT>50 || REF~"N"' ~{local_input_vcf} | bcftools query -f '%CHROM\t%POS\t%ID\t%REF\t%ALT\n' > track_dropped.tsv
 
         wc -l track_dropped.tsv
 
         ## filter out sites with too many alt alleles
-        bcftools view -e 'N_ALT>10 || REF~"N"' --no-update ~{local_input_vcf} -Ou | \
+        bcftools view -e 'N_ALT>50 || REF~"N"' --no-update ~{local_input_vcf} -Ou | \
         ## filter out the non-passing sites
         bcftools view  -f 'PASS,.' --no-update -Oz -o filtered.vcf.gz
         ## normalize, left align and split multi allelic sites to new lines, remove duplicate lines
@@ -282,10 +282,10 @@ task ExtractAnAcAfFromVCF {
     # Runtime settings:
     runtime {
         docker: "us.gcr.io/broad-dsde-methods/variantstore:ah_var_store_20211101"
-        memory: "32 GB"
+        memory: "64 GB"
         preemptible: 3
-        cpu: "2"
-        disks: "local-disk 500 SSD"
+        cpu: "4"
+        disks: "local-disk 1000 SSD"
     }
     # ------------------------------------------------
     # Outputs:
