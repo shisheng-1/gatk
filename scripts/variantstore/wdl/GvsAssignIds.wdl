@@ -16,10 +16,10 @@ workflow GvsAssignIds {
     String? docker
   }
 
-  String docker_final = select_first([docker, "us.gcr.io/broad-gatk/gatk:4.1.7.0"])
+  String docker_final = select_first([docker, "gcr.io/google.com/cloudsdktool/cloud-sdk:305.0.0"])
 
 
-  call CreateTables as CreateSampleInfoTables {
+  call CreateTables as CreateSampleInfoTable {
   	input:
       project_id = project_id,
       dataset_name = dataset_name,
@@ -36,18 +36,23 @@ workflow GvsAssignIds {
       project_id = project_id,
       dataset_name = dataset_name,
       sample_info_table = sample_info_table,
-      table_creation_done = CreateSampleInfoTables.done,
-      workspace_namespace = workspace_namespace,
-      workspace_name = workspace_name,
+      table_creation_done = CreateSampleInfoTable.done,
       gatk_override = gatk_override,
       service_account_json = service_account_json,
       docker = docker_final,
   }
 
+  call UpdateDataModel {
+    input:
+      workspace_namespace = workspace_namespace,
+      workspace_name = workspace_name,
+      gvs_ids_tsv = AssignIds.gvs_ids_tsv
+  }
+
 
   output {
     Boolean gvs_ids_created = true
-    File updates = AssignIds.gvs_ids
+    File gvs_ids_tsv = AssignIds.gvs_ids_tsv
   }
 }
 
@@ -59,8 +64,6 @@ task AssignIds {
     String sample_info_table
     String? service_account_json
     String table_creation_done
-    String workspace_namespace
-    String workspace_name
     # runtime
     File? gatk_override
     String docker
@@ -133,14 +136,6 @@ task AssignIds {
       # remove the lock table
       bq --project_id=~{project_id} rm -f -t ~{dataset_name}.sample_id_assignment_lock
 
-      # update the data model
-      python3 <<CODE
-from firecloud import api as fapi
-response = fapi.update_entities_tsv('~{workspace_namespace}', '~{workspace_name}', 'update.tsv', 'flexible')
-if response.status_code != 200:
-  print(response.status_code)
-  print(response.text)
-CODE
   >>>
   runtime {
       docker: docker
@@ -149,7 +144,35 @@ CODE
       cpu: 1
   }
   output {
-    File gvs_ids = "gvs_ids.tsv"
+    File gvs_ids_tsv = "gvs_ids.tsv"
+  }
+}
+
+task UpdateDataModel {
+  input {
+    String workspace_namespace
+    String workspace_name
+    File gvs_ids_tsv
+  }
+  meta {
+    description: "Assigns gvs_id attribute in data model"
+    volatile: true
+  }
+  command <<<
+      # update the data model
+      python3 <<CODE
+from firecloud import api as fapi
+response = fapi.update_entities_tsv('~{workspace_namespace}', '~{workspace_name}', '~{gvs_ids_tsv}', 'flexible')
+if response.status_code != 200:
+  print(response.status_code)
+  print(response.text)
+CODE
+  >>>
+  runtime {
+      docker: "broadgdac/fiss"
+      memory: "3.75 GB"
+      disks: "local-disk " + 10 + " HDD"
+      cpu: 1
   }
 }
 
