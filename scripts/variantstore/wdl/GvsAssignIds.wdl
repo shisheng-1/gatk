@@ -16,7 +16,7 @@ workflow GvsAssignIds {
     String? docker
   }
 
-  String docker_final = select_first([docker, "gcr.io/google.com/cloudsdktool/cloud-sdk:305.0.0"])
+  String docker_final = select_first([docker, "us.gcr.io/broad-gatk/gatk:4.1.7.0"])
 
 
   call CreateTables as CreateSampleInfoTable {
