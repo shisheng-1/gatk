@@ -162,7 +162,7 @@ task UpdateDataModel {
       # update the data model
       python3 <<CODE
 from firecloud import api as fapi
-response = fapi.update_entities_tsv('~{workspace_namespace}', '~{workspace_name}', '~{gvs_ids_tsv}', 'flexible')
+response = fapi.upload_entities_tsv('~{workspace_namespace}', '~{workspace_name}', '~{gvs_ids_tsv}', 'flexible')
 if response.status_code != 200:
   print(response.status_code)
   print(response.text)
