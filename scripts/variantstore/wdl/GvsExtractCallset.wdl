@@ -16,9 +16,11 @@ workflow GvsExtractCallset {
 
        # NOTE: this is just the cohort table prefix, not including project or dataset qualifiers
        # without a default value, ranges users are forced to specify a value even though it is meaningless
-       String extract_table_prefix = ""
-       String query_project = data_project
-       String fq_ranges_dataset = "~{data_project}.~{default_dataset}"
+        String extract_table_prefix = ""
+        String query_project = data_project
+        String fq_ranges_dataset = "~{data_project}.~{default_dataset}"
+
+        String inferred_reference_state = "FORTY"
 
         Boolean do_not_filter_override = false
         String? filter_set_name
@@ -37,7 +39,7 @@ workflow GvsExtractCallset {
         Int? extract_maxretries_override
         Int? split_intervals_disk_size_override
 
-        String mode = "PET"
+        String mode = "RANGES"
        
         String? service_account_json_path
 
@@ -48,9 +50,9 @@ workflow GvsExtractCallset {
 
         String fq_samples_to_extract_table = "~{data_project}.~{default_dataset}.~{extract_table_prefix}__SAMPLES"
         String fq_cohort_extract_table  = "~{data_project}.~{default_dataset}.~{extract_table_prefix}__DATA"
-   }
+  }
 
-   Array[String] tables_patterns_for_datetime_check = if (mode == "RANGES") then ["pet_%","vet_%"] else ["~{extract_table_prefix}__%"]
+   Array[String] tables_patterns_for_datetime_check = if (mode == "RANGES") then ["ref_ranges_%","vet_%"] else ["~{extract_table_prefix}__%"]
 
     call Utils.SplitIntervals {
       input:
@@ -81,9 +83,10 @@ workflow GvsExtractCallset {
                 reference_index                 = reference_index,
                 reference_dict                  = reference_dict,
                 fq_samples_to_extract_table     = fq_samples_to_extract_table,
+                fq_cohort_extract_table         = fq_cohort_extract_table,
+                inferred_reference_state        = inferred_reference_state,
                 interval_index                  = i,
                 intervals                       = SplitIntervals.interval_files[i],
-                fq_cohort_extract_table         = fq_cohort_extract_table,
                 read_project_id                 = query_project,
                 mode                            = mode,
                 do_not_filter_override          = do_not_filter_override,
@@ -142,6 +145,7 @@ task ExtractTask {
         File intervals
 
         String fq_cohort_extract_table
+        String inferred_reference_state
         String read_project_id
         String output_file
         String? output_gcs_dir
@@ -217,6 +221,7 @@ task ExtractTask {
                 -O ~{output_file} \
                 --local-sort-max-records-in-ram ~{local_sort_max_records_in_ram} \
                 --sample-table ~{fq_samples_to_extract_table} \
+                --inferred_reference_state ~{inferred_reference_state} \
                 -L ~{intervals} \
                 ~{"-XL " + excluded_intervals} \
                 --project-id ~{read_project_id} \
