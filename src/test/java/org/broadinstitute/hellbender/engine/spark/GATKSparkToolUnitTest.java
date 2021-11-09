@@ -35,10 +35,10 @@ public class GATKSparkToolUnitTest extends GATKBaseTest {
         tool.instanceMain(args);
 
         Set<VCFHeaderLine> stdHeaderLines = tool.getDefaultToolVCFHeaderLines();
-        stdHeaderLines.add(VCFHeader.getHeaderVersionLine(VCFHeader.DEFAULT_VCF_VERSION));
+        stdHeaderLines.add(VCFHeader.makeHeaderVersionLine(VCFHeader.DEFAULT_VCF_VERSION));
         VCFHeader hdr = new VCFHeader(stdHeaderLines);
 
-        VCFHeaderLine sourceLine = hdr.getOtherHeaderLine("source");
+        VCFHeaderLine sourceLine = hdr.getOtherHeaderLineUnique("source");
         Assert.assertEquals(sourceLine.getValue(), tool.getClass().getSimpleName());
 
         // TODO: this is bogus:
@@ -46,7 +46,7 @@ public class GATKSparkToolUnitTest extends GATKBaseTest {
         //  2) there can be more than one GATKCommandLine header line (or at least it should
         //     be possible to have more than one)
         //  3) this header line is not really guaranteed to be a VCFIDHeaderLine, although it is
-        VCFIDHeaderLine commandLine = (VCFIDHeaderLine) hdr.getOtherHeaderLine("GATKCommandLine");
+        VCFIDHeaderLine commandLine = (VCFIDHeaderLine) hdr.getOtherHeaderLineUnique("GATKCommandLine");
         Assert.assertEquals(commandLine.getID(), tool.getClass().getSimpleName());
 
         String commandLineString = commandLine.toString();

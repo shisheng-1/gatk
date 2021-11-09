@@ -826,10 +826,11 @@ public class Funcotator extends VariantWalker {
      */
     @VisibleForTesting
     static void checkIfAlreadyAnnotated(final VCFHeader vcfHeader, GATKPath drivingVariantFile) {
-        if (vcfHeader.getOtherHeaderLine(FuncotatorConstants.VCF_HEADER_ALREADY_ANNOTATED_1) != null) {
+        //TODO: where are these set ? those call sites need to call addMetaDataLineUnique
+        if (vcfHeader.getOtherHeaderLineUnique(FuncotatorConstants.VCF_HEADER_ALREADY_ANNOTATED_1) != null) {
             throw new UserException.BadInput("Given VCF " +drivingVariantFile+ " has already been annotated!");
         }
-        else if (vcfHeader.getOtherHeaderLine(FuncotatorConstants.VCF_HEADER_ALREADY_ANNOTATED_2) != null) {
+        else if (vcfHeader.getOtherHeaderLineUnique(FuncotatorConstants.VCF_HEADER_ALREADY_ANNOTATED_2) != null) {
             throw new UserException.BadInput("Given VCF " +drivingVariantFile+ " has already been annotated!");
         }
     }
@@ -838,7 +839,7 @@ public class Funcotator extends VariantWalker {
      * Checks to see that the given reference's sequence dictionary is a
      * superset of the given variant file's dictionary.
      *
-     * This is a more strict check than the one found in {@link GATKTool#validateSequenceDictionaries()}.
+     * This is a more strict check than the one found in {@link SAMSequenceDictionary#validateSequenceDictionaries()}.
      */
     private void checkReferenceDictionaryIsSupersetOfVariantDictionary() {
 

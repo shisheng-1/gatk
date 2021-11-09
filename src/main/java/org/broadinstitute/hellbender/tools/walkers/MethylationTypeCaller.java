@@ -64,7 +64,7 @@ public class MethylationTypeCaller extends LocusWalker {
             throw new UserException.BadInput("Error writing header, getHeaderForReads() returns null");
         }
 
-        headerLines.add(VCFHeader.getHeaderVersionLine(VCFHeader.DEFAULT_VCF_VERSION));
+        headerLines.add(VCFHeader.makeHeaderVersionLine(VCFHeader.DEFAULT_VCF_VERSION));
 
         final VCFInfoHeaderLine unconvertedCoverageLine = new VCFInfoHeaderLine(GATKVCFConstants.UNCONVERTED_BASE_COVERAGE_KEY, 1, VCFHeaderLineType.Integer, "Count of reads supporting methylation that are unconverted ");
         final VCFInfoHeaderLine coverageLine = new VCFInfoHeaderLine(GATKVCFConstants.CONVERTED_BASE_COVERAGE_KEY, 1, VCFHeaderLineType.Integer, "Count of reads supporting methylation that are converted ");

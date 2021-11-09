@@ -150,7 +150,7 @@ public class ReferenceBlockConcordanceIntegrationTest extends CommandLineProgram
                 true
                 );
         final Set<VCFHeaderLine> headerLines = new LinkedHashSet<>();
-        headerLines.add(VCFHeader.getHeaderVersionLine(VCFHeader.DEFAULT_VCF_VERSION));
+        headerLines.add(VCFHeader.makeHeaderVersionLine(VCFHeader.DEFAULT_VCF_VERSION));
         final VCFHeader header = new VCFHeader(headerLines, Collections.singletonList("TESTSAMPLE"));
 
         header.setSequenceDictionary(new SAMSequenceDictionary(Collections.singletonList(new SAMSequenceRecord("test_contig", 1000))));
