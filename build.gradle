@@ -971,7 +971,9 @@ installDist.dependsOn downloadGsaLibFile
 defaultTasks 'bundle'
 
 
-tasks.withType(JavaCompile).configureEach {
-    options.fork = true
+allprojects {
+    tasks.withType(JavaCompile).configureEach {
+        options.fork = true
+    }
 }
 
